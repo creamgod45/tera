@@ -111,5 +111,9 @@
         <!-- Settings → Editor → Color Scheme → Tera Template -->
         <colorSettingsPage implementation="com.tera.tera.TeraColorSettingsPage"/>
 
+        <!-- 默认配色（亮色主题 / Darcula 暗色主题） -->
+        <additionalTextAttributes scheme="Default" file="colorSchemes/TeraDefault.xml"/>
+        <additionalTextAttributes scheme="Darcula" file="colorSchemes/TeraDarcula.xml"/>
+
     </extensions>
 </idea-plugin>

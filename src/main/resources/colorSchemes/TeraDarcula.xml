@@ -1,0 +1,17 @@
+<scheme name="Darcula" version="142" parent_scheme="Darcula">
+  <attributes>
+    <!-- 定界符：蓝色加粗 -->
+    <option name="TERA_DELIMITER">
+      <value>
+        <option name="FOREGROUND" value="569cd6"/>
+        <option name="FONT_TYPE" value="1"/>
+      </value>
+    </option>
+    <!-- 标识符/变量名：紫色 -->
+    <option name="TERA_IDENTIFIER">
+      <value>
+        <option name="FOREGROUND" value="c586c0"/>
+      </value>
+    </option>
+  </attributes>
+</scheme>
