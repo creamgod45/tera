@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F08030"/>
+      <stop offset="100%" stop-color="#B84010"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="40" height="40" rx="8" fill="url(#bg)"/>
+
+  <!-- Left curly brace { -->
+  <path d="M15,9 C13,9 11,10 11,13 L11,18 C11,19.5 10,20 9,20 C10,20 11,20.5 11,22 L11,27 C11,30 13,31 15,31"
+        fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right curly brace } -->
+  <path d="M25,9 C27,9 29,10 29,13 L29,18 C29,19.5 30,20 31,20 C30,20 29,20.5 29,22 L29,27 C29,30 27,31 25,31"
+        fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- T letterform (centered between braces) -->
+  <rect x="15.5" y="13" width="9" height="2.5" rx="1" fill="white"/>
+  <rect x="19" y="13" width="2.5" height="14" rx="1" fill="white"/>
+</svg>

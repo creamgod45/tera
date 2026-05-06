@@ -1,0 +1,115 @@
+<!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.tera.tera</id>
+    <name>Tera</name>
+
+    <vendor>CURED-FSZ</vendor>
+
+    <description><![CDATA[
+        <p>
+          IDE support for <a href="https://keats.github.io/tera/">Tera</a> template files
+          (<code>.tera</code>) — a Rust template engine with Jinja2-style syntax.
+        </p>
+
+        <h3>Syntax Highlighting</h3>
+        <ul>
+          <li>Variable blocks &nbsp;<code>{{ }}</code></li>
+          <li>Tag blocks &nbsp;<code>{% %}</code></li>
+          <li>Comments &nbsp;<code>{# #}</code></li>
+          <li>Whitespace-trimming variants &nbsp;<code>{{- -}}</code> &nbsp;<code>{%- -%}</code></li>
+          <li>Fine-grained token colors: keywords, identifiers, strings, numbers, operators</li>
+          <li>Fully customizable via <b>Settings → Editor → Color Scheme → Tera Template</b></li>
+        </ul>
+
+        <h3>Error Detection</h3>
+        <ul>
+          <li>Unclosed delimiters &nbsp;(<code>{{</code>, <code>{%</code>, <code>{#</code>)</li>
+          <li>Mismatched or unclosed block tags
+              (<code>for</code>, <code>if</code>, <code>block</code>,
+               <code>macro</code>, <code>raw</code>, <code>filter</code>)</li>
+          <li><code>else</code> / <code>elif</code> outside an <code>if</code> block</li>
+          <li>No-argument keywords used with extra content
+              (e.g. <code>{% endif something %}</code>)</li>
+          <li>Missing loop variable or <code>in</code> keyword in <code>for</code> tags</li>
+          <li>Invalid tag names (e.g. <code>{% in ... %}</code>)</li>
+          <li>Dangling or doubled dot operators
+              (e.g. <code>item.</code>, <code>loop..index</code>)</li>
+        </ul>
+
+        <h3>Supported Keywords</h3>
+        <p>
+          <code>for</code> · <code>if</code> · <code>elif</code> · <code>else</code> ·
+          <code>block</code> · <code>macro</code> · <code>raw</code> · <code>filter</code> ·
+          <code>set</code> · <code>set_global</code> · <code>extends</code> ·
+          <code>include</code> · <code>import</code> · <code>from</code> ·
+          <code>break</code> · <code>continue</code>
+        </p>
+
+        <hr/>
+
+        <p>
+          为 <a href="https://keats.github.io/tera/">Tera</a> 模板文件（<code>.tera</code>）提供 IDE 支持。
+          Tera 是一个使用 Jinja2 风格语法的 Rust 模板引擎。
+        </p>
+
+        <h3>语法高亮</h3>
+        <ul>
+          <li>变量块 &nbsp;<code>{{ }}</code></li>
+          <li>标签块 &nbsp;<code>{% %}</code></li>
+          <li>注释 &nbsp;<code>{# #}</code></li>
+          <li>空白裁剪语法 &nbsp;<code>{{- -}}</code> &nbsp;<code>{%- -%}</code></li>
+          <li>细粒度 token 着色：关键字、标识符、字符串、数字、运算符</li>
+          <li>可在 <b>Settings → Editor → Color Scheme → Tera Template</b> 中自定义配色</li>
+        </ul>
+
+        <h3>错误检测</h3>
+        <ul>
+          <li>未闭合的定界符（<code>{{</code>、<code>{%</code>、<code>{#</code>）</li>
+          <li>块标签不匹配或未闭合
+              （<code>for</code>、<code>if</code>、<code>block</code>、
+               <code>macro</code>、<code>raw</code>、<code>filter</code>）</li>
+          <li><code>else</code> / <code>elif</code> 出现在 <code>if</code> 块外</li>
+          <li>不接受参数的关键字后附带多余内容（如 <code>{% endif something %}</code>）</li>
+          <li><code>for</code> 标签缺少循环变量或 <code>in</code> 关键字</li>
+          <li>非法标签名（如 <code>{% in ... %}</code>）</li>
+          <li>悬空或重复的点号运算符（如 <code>item.</code>、<code>loop..index</code>）</li>
+        </ul>
+
+        <h3>支持的关键字</h3>
+        <p>
+          <code>for</code> · <code>if</code> · <code>elif</code> · <code>else</code> ·
+          <code>block</code> · <code>macro</code> · <code>raw</code> · <code>filter</code> ·
+          <code>set</code> · <code>set_global</code> · <code>extends</code> ·
+          <code>include</code> · <code>import</code> · <code>from</code> ·
+          <code>break</code> · <code>continue</code>
+        </p>
+    ]]></description>
+
+    <depends>com.intellij.modules.lang</depends>
+
+<extensions defaultExtensionNs="com.intellij">
+
+        <!-- 文件类型：关联 .tera 扩展名 -->
+        <fileType name="Tera Template"
+                  implementationClass="com.tera.tera.TeraFileType"
+                  fieldName="INSTANCE"
+                  language="Tera"
+                  extensions="tera"/>
+
+        <!-- PSI 解析定义（最小化平铺树，支撑 Annotator 等上层功能） -->
+        <lang.parserDefinition language="Tera"
+                                implementationClass="com.tera.tera.TeraParserDefinition"/>
+
+        <!-- 错误报告：块标签不匹配、定界符未闭合 -->
+        <externalAnnotator language="Tera"
+                            implementationClass="com.tera.tera.TeraExternalAnnotator"/>
+
+        <!-- 语法高亮工厂 -->
+        <lang.syntaxHighlighterFactory language="Tera"
+                                        implementationClass="com.tera.tera.TeraSyntaxHighlighterFactory"/>
+
+        <!-- Settings → Editor → Color Scheme → Tera Template -->
+        <colorSettingsPage implementation="com.tera.tera.TeraColorSettingsPage"/>
+
+    </extensions>
+</idea-plugin>
