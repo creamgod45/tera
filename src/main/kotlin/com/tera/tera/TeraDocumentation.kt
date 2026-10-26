@@ -15,6 +15,40 @@ data class ParamDoc(val type: String?, val text: String)
 /** Parsed `{# ... #}` comment written directly above a macro. */
 data class DocComment(val description: String, val params: Map<String, ParamDoc>)
 
+/** A built-in function, filter or test used at some token. */
+class BuiltinRef(val def: BuiltinDef, val kind: String, val token: TeraTok)
+
+object TeraBuiltinRefs {
+    private val SKIPPED_TAGS = setOf("macro", "endmacro", "import", "extends", "include", "block", "endblock")
+
+    /** The built-in named by the token under [offset], decided by how it is written (`|`, `is`, `name(`). */
+    fun at(text: String, offset: Int): BuiltinRef? {
+        for (block in TeraSymbolScanner.scanBlocks(text)) {
+            if (offset < block.contentStart || offset > block.contentEnd) continue
+            val t = block.tokens
+            val first = t.firstOrNull()?.text
+            if (block.kind == '%' && first in SKIPPED_TAGS) return null
+            val i = t.indexOfFirst { it.type == TeraTokenTypes.IDENTIFIER && offset in it.range.startOffset..it.range.endOffset }
+            if (i < 0) return null
+            val prev = t.getOrNull(i - 1)
+            val next = t.getOrNull(i + 1)
+            fun op(x: TeraTok?, s: String) = x != null && x.type == TeraTokenTypes.OPERATOR && x.text == s
+            val name = t[i].text
+            fun kw(x: TeraTok?, s: String) = x != null && x.type == TeraTokenTypes.KEYWORD && x.text == s
+            return when {
+                op(prev, "|") || (block.kind == '%' && first == "filter" && i == 1) ->
+                    TeraBuiltins.FILTER_BY_NAME[name]?.let { BuiltinRef(it, "filter", t[i]) }
+                kw(prev, "is") || (kw(prev, "not") && kw(t.getOrNull(i - 2), "is")) ->
+                    TeraBuiltins.TEST_BY_NAME[name]?.let { BuiltinRef(it, "test", t[i]) }
+                op(next, "(") && !op(prev, ".") && !op(prev, ":") ->
+                    TeraBuiltins.FUNCTION_BY_NAME[name]?.let { BuiltinRef(it, "function", t[i]) }
+                else -> null
+            }
+        }
+        return null
+    }
+}
+
 /** Builds the Quick Documentation popups for macros, their parameters and import aliases. */
 object TeraDocumentation {
 
@@ -135,6 +169,39 @@ object TeraDocumentation {
         return sb.toString()
     }
 
+    fun builtinHtml(ref: BuiltinRef): String {
+        val def = ref.def
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>(").append(ref.kind).append(") ")
+            .append(esc(def.signature())).append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+        sb.append(DocumentationMarkup.CONTENT_START)
+            .append(esc(def.description.replaceFirstChar(Char::uppercaseChar))).append(".")
+            .append(DocumentationMarkup.CONTENT_END)
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        if (def.params.isNotEmpty()) {
+            val body = StringBuilder()
+            for (p in def.params) {
+                body.append("<p><code>").append(esc(p.name)).append("</code> – ")
+                body.append(
+                    when {
+                        def.positional -> "positional argument"
+                        p.required -> "required"
+                        p.default != null -> "optional, default <code>${esc(p.default)}</code>"
+                        else -> "optional"
+                    },
+                )
+                body.append(" – ").append(esc(p.doc)).append("</p>")
+            }
+            section(sb, "Arguments:", body.toString())
+        } else {
+            section(sb, "Arguments:", "none")
+        }
+        def.example?.let { section(sb, "Example:", "<code>${esc(it)}</code>") }
+        section(sb, "Source:", "Tera built-in ${esc(ref.kind)}")
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
     fun variableHtml(ref: TeraVariables.Ref, context: TeraContextResult?): String {
         val r = ref.result
         val name = ref.occurrence.segs[ref.index].name
@@ -196,6 +263,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         class Param(val macro: MacroDef, val param: MacroParam) : Described
         class Import(val imp: ImportDecl) : Described
         class Variable(val ref: TeraVariables.Ref, val context: TeraContextResult?) : Described
+        class Builtin(val ref: BuiltinRef) : Described
     }
 
     private fun describe(file: PsiFile, offset: Int): Described? {
@@ -205,6 +273,8 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             m.params.firstOrNull { it.range.startOffset == offset }?.let { return Described.Param(m, it) }
         }
         symbols.imports.firstOrNull { it.aliasRange.startOffset == offset }?.let { return Described.Import(it) }
+        TeraBuiltinRefs.at(file.text, offset)?.takeIf { it.token.range.startOffset == offset }
+            ?.let { return Described.Builtin(it) }
         val context = TeraContexts.forFile(file)
         TeraVariables.refAt(file.text, offset, context)?.takeIf { it.range.startOffset == offset }
             ?.let { return Described.Variable(it, context) }
@@ -232,6 +302,9 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         }
         symbols.imports.firstOrNull { targetOffset in it.aliasRange.startOffset..it.aliasRange.endOffset }
             ?.let { return here.findElementAt(it.aliasRange.startOffset) }
+
+        // Hovering a built-in function, filter or test.
+        TeraBuiltinRefs.at(here.text, targetOffset)?.let { return here.findElementAt(it.token.range.startOffset) }
 
         // Hovering a variable use.
         TeraVariables.refAt(here.text, targetOffset, TeraContexts.forFile(file))
@@ -266,6 +339,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
                 TeraDocumentation.importHtml(d.imp, templates)
             }
             is Described.Variable -> TeraDocumentation.variableHtml(d.ref, d.context)
+            is Described.Builtin -> TeraDocumentation.builtinHtml(d.ref)
             null -> null
         }
     }
@@ -280,6 +354,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
                 "${file.name}: ${d.macro.name}(${d.param.name}: ${TeraDocumentation.typeOf(d.param, doc)})"
             }
             is Described.Import -> "import \"${d.imp.path}\" as ${d.imp.alias}"
+            is Described.Builtin -> "(${d.ref.kind}) ${d.ref.def.signature()}"
             is Described.Variable -> "(variable) ${d.ref.occurrence.segs[d.ref.index].name}: " +
                 (d.ref.result.field?.rustType ?: d.ref.result.type.display())
             null -> null

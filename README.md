@@ -39,7 +39,9 @@ Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
     `{% set %}` variables, macro parameters (macros do not see the context), `loop.*`,
     `a[0].b` and `a.0`;
   - `|` completes Tera's built-in filters, `is` the built-in tests, and the built-in
-    functions are offered;
+    functions are offered; inside `range(`, `x | truncate(` and similar calls the argument
+    names are completed, and hovering a function, filter or test shows its signature,
+    arguments, defaults and an example;
   - go to definition on a variable or field jumps to the Rust field; hover shows its
     type, doc comment, source and fields;
   - unknown variables (weak warning) and unknown fields of a known struct are reported,
