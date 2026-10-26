@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.tera"
-version = "1.0-SNAPSHOT"
+version = "1.2.0"
 
 repositories {
     mavenCentral()
@@ -16,8 +16,14 @@ repositories {
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     intellijPlatform {
-        intellijIdeaCommunity("2025.1")
+        if (providers.gradleProperty("webTests").orNull == "true") {
+            intellijIdeaUltimate("2025.1")
+            bundledPlugins("com.intellij.css", "JavaScript")
+        } else {
+            intellijIdeaCommunity("2025.1")
+        }
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         // Add plugin dependencies for compilation here:
@@ -28,6 +34,12 @@ dependencies {
 }
 
 intellijPlatform {
+    pluginVerification {
+        ides {
+            create(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity, "2025.1")
+            providers.gradleProperty("verifyIde").orNull?.let { local(file(it)) }
+        }
+    }
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "251"
@@ -35,12 +47,19 @@ intellijPlatform {
         }
 
         changeNotes = """
-            Initial version
+            Fix false errors for whitespace-trimming delimiters and named endmacro/endblock tags.
+            Integrate native template data language parsing and highlighting for HTML, CSS and JavaScript.
         """.trimIndent()
     }
 }
 
 tasks {
+    test {
+        systemProperty("tera.webTests", providers.gradleProperty("webTests").getOrElse("false"))
+        if (providers.gradleProperty("webTests").orNull != "true") {
+            exclude("**/TeraWebIntegrationTest.class")
+        }
+    }
     // Set the JVM compatibility versions
     withType<JavaCompile> {
         sourceCompatibility = "21"

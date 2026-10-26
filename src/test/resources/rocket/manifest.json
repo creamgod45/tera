@@ -1,0 +1,46 @@
+{
+  "repository": "https://github.com/rwf2/Rocket",
+  "revision": "58a3554a5001a9228b09bdefa87adc8939d818dc",
+  "fixtures": [
+    {
+      "path": "examples/forms/templates/index.html.tera",
+      "sha256": "512d7cd4b1e038d995cf6c7e0ab81e55ee506c1dab4a780380c84e6e85beeaae",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/forms/templates/macros.html.tera",
+      "sha256": "167edef56a30691186cd2d091962adfd2330d1cf8445979d2179ff85bcae9f9f",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/forms/templates/success.html.tera",
+      "sha256": "c937c25f16cffe7525df630f8c09aa2508bac8f06d22eca75e5424fe37534b65",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/templating/templates/tera/base.html.tera",
+      "sha256": "4431234095ca54e83aa2e89f7cafd99b3d2a9084a258c8df5b5498b4f10e3afa",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/templating/templates/tera/error/404.html.tera",
+      "sha256": "a1eac87eeadde31a690b482659eac4b01e766c6241f495e4e371d29df0ff9def",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/templating/templates/tera/index.html.tera",
+      "sha256": "5afa1283786a8f03cccfc55f519e3141aaf7c3784a8eda354cfcb33b74d051a9",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/templating/templates/tera/nav.html.tera",
+      "sha256": "e2823ca3a1adcfb63cf88711fbca68f5a69e731ba4b187aa268d35ee8eaf00aa",
+      "expectedTeraErrors": 0
+    },
+    {
+      "path": "examples/todo/static/index.html.tera",
+      "sha256": "34978da0c8c2280f42b0c77417ae457f8e916de3a40a98735180d6ad2fad92e7",
+      "expectedTeraErrors": 0
+    }
+  ]
+}

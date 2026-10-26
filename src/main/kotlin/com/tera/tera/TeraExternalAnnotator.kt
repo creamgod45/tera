@@ -47,7 +47,8 @@ class TeraExternalAnnotator : ExternalAnnotator<String, List<TeraError>>() {
     private val MIDDLE_KEYWORDS = setOf("else", "elif")
 
     /** 不接受任何参数的关键字 */
-    private val NO_ARG_KEYWORDS = CLOSERS.keys + setOf("else", "break", "continue")
+    private val NAMED_CLOSERS = setOf("endmacro", "endblock")
+    private val NO_ARG_KEYWORDS = (CLOSERS.keys - NAMED_CLOSERS) + setOf("else", "break", "continue")
 
     /**
      * 只能出现在表达式内部、不能作为 tag 第一个词的关键字。
@@ -202,6 +203,18 @@ class TeraExternalAnnotator : ExternalAnnotator<String, List<TeraError>>() {
         }
 
         // ── 按 tag 类型做专项校验 ─────────────────────────────────────────────
+        // Tera permits one optional identifier after endmacro/endblock.
+        if (first.text in NAMED_CLOSERS && tokens.size > 1) {
+            val name = tokens[1]
+            if (!name.text.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]*")) || tokens.size > 2) {
+                errors.add(TeraError(
+                    TeraBundle.message("error.tag.optional.name", first.text),
+                    TextRange(name.range.startOffset, tokens.last().range.endOffset),
+                    HighlightSeverity.ERROR,
+                ))
+            }
+        }
+
         when (first.text) {
             "for"  -> validateFor(tokens, errors)
             "if",

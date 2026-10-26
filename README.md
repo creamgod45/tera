@@ -1,117 +1,62 @@
-# IntelliJ Platform Plugin Template
+# Tera for JetBrains IDEs
 
-[![Twitter Follow](https://img.shields.io/badge/follow-%40JBPlatform-1DA1F2?logo=twitter)](https://twitter.com/JBPlatform)
-[![Developers Forum](https://img.shields.io/badge/JetBrains%20Platform-Join-blue)][jb:forum]
+Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
 
-## Plugin template structure
+## Editing templates
 
-A generated project contains the following content structure:
+- Tera syntax highlighting, including whitespace control (`{%-`, `-%}`, `{{-`,
+  `-}}`, `{#-`, `-#}`).
+- Block/delimiter diagnostics, with optional names on `endmacro` and `endblock`.
+- Native template data language integration: `.html.tera` uses HTML,
+  `.css.tera` uses CSS, and `.js.tera` uses JavaScript when those languages are
+  installed and enabled. Files without a recognized inner extension default to HTML.
+- HTML tags, attributes, and embedded `<style>`/`<script>` content use the IDE's
+  language services and color scheme. This is IntelliJ template/PSI integration,
+  not an external LSP server. No Node.js server needs to be configured.
+- Override the data language through **Settings → Languages & Frameworks →
+  Template Data Languages**. Customize Tera colors under **Editor → Color
+  Scheme → Tera Template**, and HTML/CSS/JavaScript colors in their own pages.
 
+HTML support is required. CSS/JavaScript features depend on the host IDE's
+language plugins; installing this plugin does not add WebStorm's services to
+an IDE that does not provide them. Tera diagnostics are structural checks, not
+a complete implementation of the Tera runtime or a Rust context type checker.
+Template output that generates arbitrary language syntax may require additional
+context-aware handling; this plugin does not render templates or infer their output.
+
+## Build and test
+
+Use JDK 21 and the included Gradle wrapper:
+
+```sh
+bash ./gradlew test buildPlugin
+bash ./gradlew test -PwebTests=true
 ```
-.
-├── .run/                   Predefined Run/Debug Configurations
-├── build/                  Output build directory
-├── gradle
-│   ├── wrapper/            Gradle Wrapper
-├── src                     Plugin sources
-│   ├── main
-│   │   ├── kotlin/         Kotlin production sources
-│   │   └── resources/      Resources - plugin.xml, icons, messages
-├── .gitignore              Git ignoring rules
-├── build.gradle.kts        Gradle build configuration
-├── gradle.properties       Gradle configuration properties
-├── gradlew                 *nix Gradle Wrapper script
-├── gradlew.bat             Windows Gradle Wrapper script
-├── README.md               README
-└── settings.gradle.kts     Gradle project settings
-```
 
-In addition to the configuration files, the most crucial part is the `src` directory, which contains our implementation
-and the manifest for our plugin – [plugin.xml][file:plugin.xml].
+The default suite uses IntelliJ IDEA Community 2025.1 and checks HTML integration
+without requiring commercial web plugins. The web suite uses IntelliJ IDEA
+Ultimate 2025.1 with its bundled CSS/JavaScript plugins, runs the core tests again,
+and checks embedded language PSI, direct CSS/JS templates and code completion.
+Gradle downloads the test IDEs; the first run can take several minutes.
 
-> [!NOTE]
-> To use Java in your plugin, create the `/src/main/java` directory.
+The eight unmodified Rocket templates in `src/test/resources/rocket` are regression
+assets. Their source revision, checksums, expected Tera diagnostic counts, and
+MIT license are included. Tests check checksums, zero Tera errors, real HTML
+structure, source offsets, and lexer restart behavior. Mutation tests check that
+missing/unexpected closers still report errors at the right locations. Additional
+synthetic cases cover syntax boundaries and web integration absent from Rocket's
+original assets.
 
-## Plugin configuration file
+Reports: `build/reports/tests/test/index.html` and `build/test-results/test/`.
+A subsequent test run replaces these reports; copy them before switching suites.
+See `docs/validation.md` for the recorded validation and its limits.
 
-The plugin configuration file is a [plugin.xml][file:plugin.xml] file located in the `src/main/resources/META-INF`
-directory.
-It provides general information about the plugin, its dependencies, extensions, and listeners.
+## Install a local build
 
-You can read more about this file in the [Plugin Configuration File][docs:plugin.xml] section of our documentation.
+Build the ZIP, then in the IDE open **Settings → Plugins → gear menu → Install
+Plugin from Disk**, select `build/distributions/tera-1.2.0.zip`, and restart if
+prompted. This replaces the installed plugin with the same ID (`com.tera.tera`).
+To return to the Marketplace version, uninstall the local build and reinstall Tera.
 
-If you're still not quite sure what this is all about, read our
-introduction: [What is the IntelliJ Platform?][docs:intro]
-
-$H$H Predefined Run/Debug configurations
-
-Within the default project structure, there is a `.run` directory provided containing predefined *Run/Debug
-configurations* that expose corresponding Gradle tasks:
-
-| Configuration name | Description                                                                                                                                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Run Plugin         | Runs [`:runIde`][gh:intellij-platform-gradle-plugin-runIde] IntelliJ Platform Gradle Plugin task. Use the *Debug* icon for plugin debugging.                                        |
-| Run Tests          | Runs [`:test`][gradle:lifecycle-tasks] Gradle task.                                                                                                                                 |
-| Run Verifications  | Runs [`:verifyPlugin`][gh:intellij-platform-gradle-plugin-verifyPlugin] IntelliJ Platform Gradle Plugin task to check the plugin compatibility against the specified IntelliJ IDEs. |
-
-> [!NOTE]
-> You can find the logs from the running task in the `idea.log` tab.
-
-## Publishing the plugin
-
-> [!TIP]
-> Make sure to follow all guidelines listed in [Publishing a Plugin][docs:publishing] to follow all recommended and
-> required steps.
-
-Releasing a plugin to [JetBrains Marketplace](https://plugins.jetbrains.com) is a straightforward operation that uses
-the `publishPlugin` Gradle task provided by
-the [intellij-platform-gradle-plugin][gh:intellij-platform-gradle-plugin-docs].
-
-You can also upload the plugin to the [JetBrains Plugin Repository](https://plugins.jetbrains.com/plugin/upload)
-manually via UI.
-
-## Useful links
-
-- [IntelliJ Platform SDK Plugin SDK][docs]
-- [IntelliJ Platform Gradle Plugin Documentation][gh:intellij-platform-gradle-plugin-docs]
-- [IntelliJ Platform Explorer][jb:ipe]
-- [JetBrains Marketplace Quality Guidelines][jb:quality-guidelines]
-- [IntelliJ Platform UI Guidelines][jb:ui-guidelines]
-- [JetBrains Marketplace Paid Plugins][jb:paid-plugins]
-- [IntelliJ SDK Code Samples][gh:code-samples]
-
-[docs]: https://plugins.jetbrains.com/docs/intellij
-
-[docs:intro]: https://plugins.jetbrains.com/docs/intellij/intellij-platform.html?from=IJPluginTemplate
-
-[docs:plugin.xml]: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html?from=IJPluginTemplate
-
-[docs:publishing]: https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate
-
-[file:plugin.xml]: ./src/main/resources/META-INF/plugin.xml
-
-[gh:code-samples]: https://github.com/JetBrains/intellij-sdk-code-samples
-
-[gh:intellij-platform-gradle-plugin]: https://github.com/JetBrains/intellij-platform-gradle-plugin
-
-[gh:intellij-platform-gradle-plugin-docs]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
-
-[gh:intellij-platform-gradle-plugin-runIde]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#runIde
-
-[gh:intellij-platform-gradle-plugin-verifyPlugin]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#verifyPlugin
-
-[gradle:lifecycle-tasks]: https://docs.gradle.org/current/userguide/java_plugin.html#lifecycle_tasks
-
-[jb:github]: https://github.com/JetBrains/.github/blob/main/profile/README.md
-
-[jb:forum]: https://platform.jetbrains.com/
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:paid-plugins]: https://plugins.jetbrains.com/docs/marketplace/paid-plugins-marketplace.html
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:ipe]: https://jb.gg/ipe
-
-[jb:ui-guidelines]: https://jetbrains.github.io/ui
+A fork's ZIP/release is not an official JetBrains Marketplace update. Publishing
+an update to the existing Marketplace listing requires its owner's permissions.

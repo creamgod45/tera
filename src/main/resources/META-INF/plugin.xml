@@ -86,8 +86,14 @@
     ]]></description>
 
     <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.xml</depends>
 
 <extensions defaultExtensionNs="com.intellij">
+        <lang.ast.factory language="Tera" implementationClass="com.tera.tera.TeraAstFactory"/>
+        <lang.fileViewProviderFactory language="Tera"
+            implementationClass="com.tera.tera.TeraFileViewProviderFactory"/>
+        <editorHighlighterProvider filetype="Tera Template"
+            implementationClass="com.tera.tera.TeraEditorHighlighterProvider"/>
 
         <!-- 文件类型：关联 .tera 扩展名 -->
         <fileType name="Tera Template"
