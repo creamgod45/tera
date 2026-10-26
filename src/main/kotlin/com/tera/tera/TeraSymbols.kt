@@ -21,7 +21,7 @@ class TeraBlock(
 
 // ── Symbols ──────────────────────────────────────────────────────────────────
 
-data class MacroParam(val name: String, val hasDefault: Boolean, val range: TextRange)
+data class MacroParam(val name: String, val hasDefault: Boolean, val range: TextRange, val defaultText: String? = null)
 
 data class MacroDef(val name: String, val params: List<MacroParam>, val nameRange: TextRange) {
     val required: List<MacroParam> get() = params.filter { !it.hasDefault }
@@ -30,11 +30,15 @@ data class MacroDef(val name: String, val params: List<MacroParam>, val nameRang
 /** `{% import "path" as alias %}` */
 data class ImportDecl(val path: String, val alias: String, val pathRange: TextRange, val aliasRange: TextRange)
 
-data class CallArg(val name: String?, val range: TextRange)
+data class CallArg(val name: String?, val range: TextRange) {
+    /** Range of just the `name` in `name=value`. */
+    val nameRange: TextRange? get() = name?.let { TextRange(range.startOffset, range.startOffset + it.length) }
+}
 
 /** `namespace::name(args)`; [argsStart]..[argsEnd] is the region between the parentheses. */
 data class MacroCall(
     val namespace: String,
+    val namespaceRange: TextRange,
     val name: String,
     val nameRange: TextRange,
     val args: List<CallArg>,
@@ -150,7 +154,8 @@ object TeraSymbolScanner {
         if (!isOp(t.getOrNull(2), "(")) return null
         val params = splitArgs(t, 2).groups.mapNotNull { g ->
             val id = g.firstOrNull()?.takeIf { it.type == TeraTokenTypes.IDENTIFIER } ?: return@mapNotNull null
-            MacroParam(id.text, isOp(g.getOrNull(1), "="), id.range)
+            val hasDefault = isOp(g.getOrNull(1), "=")
+            MacroParam(id.text, hasDefault, id.range, if (hasDefault) g.drop(2).joinToString("") { it.text } else null)
         }
         return MacroDef(name.text, params, name.range)
     }
@@ -178,6 +183,7 @@ object TeraSymbolScanner {
             val closed = args.closeIndex >= 0
             out.add(MacroCall(
                 namespace = t[i].text,
+                namespaceRange = t[i].range,
                 name = t[i + 3].text,
                 nameRange = t[i + 3].range,
                 args = args.groups.map { g ->

@@ -10,21 +10,29 @@ import com.intellij.openapi.vfs.VirtualFile
 object TeraTemplateResolver {
     private const val MAX_NAMES = 500
 
-    fun resolve(from: VirtualFile, name: String): VirtualFile? {
+    fun resolve(from: VirtualFile, name: String): VirtualFile? = resolveAll(from, name).firstOrNull()
+
+    /**
+     * Every template [name] can refer to at the nearest root that has a match: an exact path first,
+     * then siblings that differ only by extensions (`macros.html.tera`, `macros.txt.tera`, ...).
+     */
+    fun resolveAll(from: VirtualFile, name: String): List<VirtualFile> {
         val rel = name.trim().trimStart('/')
-        if (rel.isEmpty()) return null
+        if (rel.isEmpty()) return emptyList()
         val base = rel.substringAfterLast('/')
         var dir = from.parent
         while (dir != null) {
-            dir.findFileByRelativePath(rel)?.takeIf { !it.isDirectory }?.let { return it }
+            val found = linkedSetOf<VirtualFile>()
+            dir.findFileByRelativePath(rel)?.takeIf { !it.isDirectory }?.let(found::add)
             val holder = if ('/' in rel) dir.findFileByRelativePath(rel.substringBeforeLast('/')) else dir
             holder?.takeIf { it.isDirectory }?.children
                 ?.filter { !it.isDirectory && it.name.endsWith(".tera") && it.name.startsWith("$base.") }
-                ?.minByOrNull { it.name }
-                ?.let { return it }
+                ?.sortedBy { it.name }
+                ?.let(found::addAll)
+            if (found.isNotEmpty()) return found.toList()
             dir = dir.parent
         }
-        return null
+        return emptyList()
     }
 
     /** Template names usable in `import`/`extends`/`include`, relative to the nearest `templates` folder. */

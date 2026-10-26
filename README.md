@@ -15,6 +15,18 @@ Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
 - Completion: macro names after `ns::` (inserted with their required arguments),
   parameter names inside a call, import aliases and `self`, tag keywords after
   `{%`, and template names inside `import`/`extends`/`include` strings.
+- Go to definition (Cmd/Ctrl+B or Cmd/Ctrl+click) from a macro name, namespace
+  alias, call argument name, or the path in `import`/`extends`/`include`. When
+  several sources match (for example `macros.html.tera` and `macros.txt.tera`,
+  or an alias imported twice) the IDE shows a chooser list.
+- Quick Documentation on hover for each part of a call such as
+  `m::input(label="Publish Date", type="date", name="submission.date")`:
+  the alias shows the import and its macros, the macro name shows its signature,
+  parameters and description, and each argument name shows its type, required/optional
+  kind and description. Write the description in a `{# ... #}` comment directly
+  above the macro, optionally with `@param name {type} text` lines; without a
+  `{type}` the type is inferred from the default value (string, integer, float,
+  boolean, array, object) or shown as `any`.
 - Native template data language integration: `.html.tera` uses HTML,
   `.css.tera` uses CSS, and `.js.tera` uses JavaScript when those languages are
   installed and enabled. Files without a recognized inner extension default to HTML.

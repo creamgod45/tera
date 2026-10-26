@@ -114,6 +114,13 @@
         <completion.contributor language="any"
                                 implementationClass="com.tera.tera.TeraCompletionContributor"/>
 
+        <!-- 跳转到定义：宏、命名空间、参数、模板路径（多个来源时弹出列表） -->
+        <gotoDeclarationHandler implementation="com.tera.tera.TeraGotoDeclarationHandler"/>
+
+        <!-- 悬停 / Quick Documentation：宏签名、参数、说明注释 -->
+        <lang.documentationProvider language="Tera"
+                                    implementationClass="com.tera.tera.TeraDocumentationProvider"/>
+
         <!-- 语法高亮工厂 -->
         <lang.syntaxHighlighterFactory language="Tera"
                                         implementationClass="com.tera.tera.TeraSyntaxHighlighterFactory"/>

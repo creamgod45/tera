@@ -70,7 +70,7 @@ object TeraCompletionEngine {
             prior[prior.size - 3].type == TeraTokenTypes.IDENTIFIER
         ) {
             val macros = macrosOf(prior[prior.size - 3].text) ?: return emptyList()
-            return macros.map(::macroSuggestion)
+            return macros.distinctBy { it.name }.map(::macroSuggestion)
         }
 
         // ns::macro(<caret>) → remaining parameter names

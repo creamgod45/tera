@@ -1,0 +1,248 @@
+package com.tera.tera
+
+import com.intellij.lang.documentation.AbstractDocumentationProvider
+import com.intellij.lang.documentation.DocumentationMarkup
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
+
+/** `@param name {type} text` entry of a macro's doc comment. */
+data class ParamDoc(val type: String?, val text: String)
+
+/** Parsed `{# ... #}` comment written directly above a macro. */
+data class DocComment(val description: String, val params: Map<String, ParamDoc>)
+
+/** Builds the Quick Documentation popups for macros, their parameters and import aliases. */
+object TeraDocumentation {
+
+    private val PARAM_TAG = Regex("""^@param\s+([A-Za-z_]\w*)\s*(?:\{([^}]*)\})?\s*(?:[-–:]\s*)?(.*)$""")
+    private val NUMBER = Regex("""-?\d+""")
+    private val FLOAT = Regex("""-?\d+\.\d+""")
+
+    // ── model helpers ────────────────────────────────────────────────────────
+
+    /** Declared `{type}` of the parameter, else a type inferred from its default value, else `any`. */
+    fun typeOf(p: MacroParam, doc: DocComment?): String {
+        doc?.params?.get(p.name)?.type?.takeIf { it.isNotBlank() }?.let { return it }
+        val d = p.defaultText?.trim().orEmpty()
+        return when {
+            d.isEmpty() -> "any"
+            d.startsWith("\"") || d.startsWith("'") -> "string"
+            d == "true" || d == "false" -> "boolean"
+            FLOAT.matches(d) -> "float"
+            NUMBER.matches(d) -> "integer"
+            d.startsWith("[") -> "array"
+            d.startsWith("{") -> "object"
+            else -> "any"
+        }
+    }
+
+    fun signature(m: MacroDef): String =
+        m.params.joinToString(", ", "macro ${m.name}(", ")") { p ->
+            if (p.hasDefault) "${p.name}=${p.defaultText.orEmpty()}" else p.name
+        }
+
+    /** The `{# ... #}` comment placed directly before the macro's opening tag, if any. */
+    fun docComment(text: String, macro: MacroDef): DocComment? {
+        val tagStart = text.lastIndexOf("{%", macro.nameRange.startOffset)
+        if (tagStart < 0) return null
+        val before = text.substring(0, tagStart).trimEnd()
+        if (!before.endsWith("#}")) return null
+        val commentStart = before.lastIndexOf("{#")
+        if (commentStart < 0) return null
+        val body = before.substring(commentStart + 2, before.length - 2).trim('-', ' ', '\t', '\r', '\n')
+        val lines = body.lines().map { it.trim().removePrefix("*").trim() }
+
+        val description = mutableListOf<String>()
+        val params = linkedMapOf<String, ParamDoc>()
+        var current: String? = null
+        for (line in lines) {
+            val m = PARAM_TAG.matchEntire(line)
+            when {
+                m != null -> {
+                    current = m.groupValues[1]
+                    params[current] = ParamDoc(m.groupValues[2].trim().ifEmpty { null }, m.groupValues[3].trim())
+                }
+                line.startsWith("@") -> current = null
+                current != null && line.isNotEmpty() -> params[current]!!.let {
+                    params[current] = it.copy(text = (it.text + " " + line).trim())
+                }
+                current == null -> description.add(line)
+            }
+        }
+        val desc = description.joinToString("\n").trim()
+        if (desc.isEmpty() && params.isEmpty()) return null
+        return DocComment(desc, params)
+    }
+
+    // ── HTML ─────────────────────────────────────────────────────────────────
+
+    private fun esc(s: String) = StringUtil.escapeXmlEntities(s)
+    private fun para(s: String) = esc(s).replace("\n", "<br>")
+
+    private fun section(sb: StringBuilder, header: String, body: String) {
+        sb.append(DocumentationMarkup.SECTION_HEADER_START).append(esc(header))
+            .append(DocumentationMarkup.SECTION_SEPARATOR).append(body).append(DocumentationMarkup.SECTION_END)
+    }
+
+    fun macroHtml(text: String, macro: MacroDef, fileName: String): String {
+        val doc = docComment(text, macro)
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>").append(esc(signature(macro))).append("</pre>")
+            .append(DocumentationMarkup.DEFINITION_END)
+        doc?.description?.takeIf { it.isNotEmpty() }?.let {
+            sb.append(DocumentationMarkup.CONTENT_START).append(para(it)).append(DocumentationMarkup.CONTENT_END)
+        }
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        if (macro.params.isEmpty()) {
+            section(sb, "Parameters:", "none")
+        } else {
+            val body = StringBuilder()
+            for (p in macro.params) {
+                body.append("<p><code>").append(esc(p.name)).append("</code>: <i>").append(esc(typeOf(p, doc)))
+                    .append("</i> – ")
+                if (p.hasDefault) body.append("optional, default <code>").append(esc(p.defaultText.orEmpty())).append("</code>")
+                else body.append("required")
+                doc?.params?.get(p.name)?.text?.takeIf { it.isNotEmpty() }?.let { body.append(" – ").append(esc(it)) }
+                body.append("</p>")
+            }
+            section(sb, "Parameters:", body.toString())
+        }
+        section(sb, "Defined in:", "<code>${esc(fileName)}</code>")
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
+    fun paramHtml(text: String, macro: MacroDef, param: MacroParam, fileName: String): String {
+        val doc = docComment(text, macro)
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>(parameter) ")
+            .append(esc(param.name)).append(": ").append(esc(typeOf(param, doc)))
+            .append(if (param.hasDefault) " = " + esc(param.defaultText.orEmpty()) else "")
+            .append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+        doc?.params?.get(param.name)?.text?.takeIf { it.isNotEmpty() }?.let {
+            sb.append(DocumentationMarkup.CONTENT_START).append(para(it)).append(DocumentationMarkup.CONTENT_END)
+        }
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        section(sb, "Kind:", if (param.hasDefault) "optional, default <code>${esc(param.defaultText.orEmpty())}</code>" else "required")
+        section(sb, "Macro:", "<code>${esc(signature(macro))}</code>")
+        doc?.description?.takeIf { it.isNotEmpty() }?.let { section(sb, "About macro:", para(it)) }
+        section(sb, "Defined in:", "<code>${esc(fileName)}</code>")
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
+    /** [templates]: file name, its text and macros, for every template the import path resolves to. */
+    fun importHtml(imp: ImportDecl, templates: List<Triple<String, String, List<MacroDef>>>): String {
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>import \"").append(esc(imp.path))
+            .append("\" as ").append(esc(imp.alias)).append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        if (templates.isEmpty()) {
+            section(sb, "Template:", "not found")
+        } else {
+            section(sb, "Template:", templates.joinToString("<br>") { "<code>${esc(it.first)}</code>" })
+            val body = StringBuilder()
+            for ((_, text, macros) in templates) for (m in macros) {
+                body.append("<p><code>").append(esc(signature(m).removePrefix("macro "))).append("</code>")
+                docComment(text, m)?.description?.lineSequence()?.firstOrNull()?.takeIf { it.isNotEmpty() }
+                    ?.let { body.append(" – ").append(esc(it)) }
+                body.append("</p>")
+            }
+            section(sb, "Macros:", body.toString().ifEmpty { "none" })
+        }
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+}
+
+class TeraDocumentationProvider : AbstractDocumentationProvider() {
+
+    /** What a documentation request on a leaf of a Tera file refers to. */
+    private sealed interface Described {
+        class Macro(val macro: MacroDef) : Described
+        class Param(val macro: MacroDef, val param: MacroParam) : Described
+        class Import(val imp: ImportDecl) : Described
+    }
+
+    private fun describe(file: PsiFile, offset: Int): Described? {
+        val symbols = TeraSymbolScanner.scan(file.text)
+        for (m in symbols.macros) {
+            if (m.nameRange.startOffset == offset) return Described.Macro(m)
+            m.params.firstOrNull { it.range.startOffset == offset }?.let { return Described.Param(m, it) }
+        }
+        symbols.imports.firstOrNull { it.aliasRange.startOffset == offset }?.let { return Described.Import(it) }
+        return null
+    }
+
+    /**
+     * The declaration leaf (macro name, parameter or import alias — in whichever file declares it)
+     * that documentation at [targetOffset] describes: hovering any part of
+     * `m::input(label=...)` or a declaration itself both work.
+     */
+    override fun getCustomDocumentationElement(
+        editor: Editor, file: PsiFile, contextElement: PsiElement?, targetOffset: Int,
+    ): PsiElement? {
+        if (file.viewProvider.baseLanguage != TeraLanguage) return null
+        val here = file.viewProvider.getPsi(TeraLanguage) ?: return null
+        val vFile = file.originalFile.virtualFile
+
+        // Hovering a declaration itself.
+        val symbols = TeraSymbolScanner.scan(here.text)
+        for (m in symbols.macros) {
+            if (targetOffset in m.nameRange.startOffset..m.nameRange.endOffset) return here.findElementAt(m.nameRange.startOffset)
+            m.params.firstOrNull { targetOffset in it.range.startOffset..it.range.endOffset }
+                ?.let { return here.findElementAt(it.range.startOffset) }
+        }
+        symbols.imports.firstOrNull { targetOffset in it.aliasRange.startOffset..it.aliasRange.endOffset }
+            ?.let { return here.findElementAt(it.aliasRange.startOffset) }
+
+        // Hovering a use: take the first declaration navigation would offer.
+        val templatesOf = { path: String -> vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty() }
+        val manager = PsiManager.getInstance(file.project)
+        for (def in TeraNavigation.definitions(here.text, targetOffset, templatesOf)) {
+            if (def.offset < 0) continue
+            val psi = if (def.file == null) here
+            else manager.findFile(def.file)?.viewProvider?.getPsi(TeraLanguage) ?: continue
+            if (describe(psi, def.offset) != null) return psi.findElementAt(def.offset)
+        }
+        return null
+    }
+
+    override fun generateDoc(element: PsiElement?, originalElement: PsiElement?): String? {
+        element ?: return null
+        val file = element.containingFile
+        val text = file.text
+        return when (val d = describe(file, element.textRange.startOffset)) {
+            is Described.Macro -> TeraDocumentation.macroHtml(text, d.macro, file.name)
+            is Described.Param -> TeraDocumentation.paramHtml(text, d.macro, d.param, file.name)
+            is Described.Import -> {
+                val vFile: VirtualFile? = file.originalFile.virtualFile
+                val templates = vFile?.let { TeraImports.templatesOf(it, d.imp.path) }.orEmpty().map { (f, macros) ->
+                    val src = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(f)?.text
+                        ?: String(f.contentsToByteArray(), f.charset)
+                    Triple(f.name, src, macros)
+                }
+                TeraDocumentation.importHtml(d.imp, templates)
+            }
+            null -> null
+        }
+    }
+
+    override fun getQuickNavigateInfo(element: PsiElement?, originalElement: PsiElement?): String? {
+        element ?: return null
+        val file = element.containingFile
+        return when (val d = describe(file, element.textRange.startOffset)) {
+            is Described.Macro -> "${file.name}: ${TeraDocumentation.signature(d.macro)}"
+            is Described.Param -> {
+                val doc = TeraDocumentation.docComment(file.text, d.macro)
+                "${file.name}: ${d.macro.name}(${d.param.name}: ${TeraDocumentation.typeOf(d.param, doc)})"
+            }
+            is Described.Import -> "import \"${d.imp.path}\" as ${d.imp.alias}"
+            null -> null
+        }
+    }
+}
