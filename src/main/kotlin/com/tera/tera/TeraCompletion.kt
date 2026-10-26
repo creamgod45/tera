@@ -36,6 +36,7 @@ object TeraCompletionEngine {
         offset: Int,
         importedMacros: (String) -> List<MacroDef>?,
         templateNames: () -> List<String>,
+        context: TeraContextResult? = null,
     ): List<TeraSuggestion> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
         val block = blocks.firstOrNull { offset >= it.contentStart && offset <= it.contentEnd } ?: return emptyList()
@@ -89,13 +90,51 @@ object TeraCompletionEngine {
 
         if (block.kind == '%' && prior.isEmpty()) return TAG_KEYWORDS.map { TeraSuggestion(it) }
 
-        if (prior.lastOrNull()?.let { isOp(it, ".") || isOp(it, "|") || isOp(it, ":") } == true) return emptyList()
+        val snapshot = TeraScopes.snapshots(blocks, context)[blocks.indexOf(block)]
+        val last = prior.lastOrNull()
+        if (last != null && isOp(last, ".")) return fieldSuggestions(prior, snapshot, context)
+        if (last != null && isOp(last, "|")) {
+            return TeraBuiltins.FILTERS.map { (n, d) -> TeraSuggestion(n, d, "filter") }
+        }
+        if (last != null && last.type == TeraTokenTypes.KEYWORD && (last.text == "is" ||
+                (last.text == "not" && prior.getOrNull(prior.size - 2)?.text == "is"))
+        ) {
+            return TeraBuiltins.TESTS.map { (n, d) -> TeraSuggestion(n, d, "test") }
+        }
+        if (last != null && isOp(last, ":")) return emptyList()
         if (block.kind == '%' && first in NO_NAMESPACE_TAGS) return emptyList()
+        // Names being declared, not referenced.
+        if (block.kind == '%' && (first == "set" || first == "set_global") && prior.none { isOp(it, "=") }) return emptyList()
+        if (block.kind == '%' && first == "for" &&
+            prior.none { it.type == TeraTokenTypes.KEYWORD && it.text == "in" }
+        ) return emptyList()
+
+        val result = mutableListOf<TeraSuggestion>()
+        val seen = mutableSetOf<String>()
+        for (b in snapshot.bindings) {
+            if (seen.add(b.name)) result.add(TeraSuggestion(b.name, ": ${b.type.display()}", b.detail.orEmpty()))
+        }
+        if (!snapshot.inMacro) {
+            for (v in context?.variables.orEmpty()) {
+                if (seen.add(v.name)) result.add(TeraSuggestion(v.name, ": ${v.rustType ?: v.type.display()}", "context"))
+            }
+        }
+        for ((n, d) in TeraBuiltins.FUNCTIONS) result.add(TeraSuggestion(n, d, "function", "()", 1))
         val namespaces = buildList {
             if (symbols.macros.isNotEmpty()) add("self")
             symbols.imports.forEach { add(it.alias) }
         }.distinct()
-        return namespaces.map { TeraSuggestion(it, "macros", "", "::") }
+        namespaces.forEach { result.add(TeraSuggestion(it, "macros", "", "::")) }
+        return result
+    }
+
+    private fun fieldSuggestions(
+        prior: List<TeraTok>, snapshot: TeraScopeSnapshot, context: TeraContextResult?,
+    ): List<TeraSuggestion> {
+        val path = TeraScopes.pathBefore(prior) ?: return emptyList()
+        val type = TeraScopes.resolvePath(path, snapshot, context).type
+        return (type as? TeraType.Struct)?.fields.orEmpty()
+            .map { TeraSuggestion(it.name, ": ${it.rustType ?: it.type.display()}", "field") }
     }
 
     private fun isOp(t: TeraTok, s: String) = t.type == TeraTokenTypes.OPERATOR && t.text == s
@@ -131,6 +170,7 @@ class TeraCompletionContributor : CompletionContributor() {
                     file.text, parameters.offset,
                     importedMacros = { path -> vFile?.let { TeraImports.macrosOf(it, path) } },
                     templateNames = { vFile?.let(TeraTemplateResolver::templateNames).orEmpty() },
+                    context = TeraContexts.forFile(file),
                 )
                 for (s in suggestions) {
                     var item = LookupElementBuilder.create(s.text)
@@ -158,5 +198,12 @@ class TeraCompletionContributor : CompletionContributor() {
 
     @Suppress("OVERRIDE_DEPRECATION")
     override fun invokeAutoPopup(position: PsiElement, typeChar: Char): Boolean =
-        typeChar == ':' && position.containingFile?.viewProvider?.baseLanguage == TeraLanguage
+        position.containingFile?.viewProvider?.baseLanguage == TeraLanguage &&
+            (typeChar == ':' || ((typeChar == '.' || typeChar == '|') && insideTeraBlock(position)))
+
+    private fun insideTeraBlock(position: PsiElement): Boolean {
+        val offset = position.textRange.startOffset
+        return TeraSymbolScanner.scanBlocks(position.containingFile.text)
+            .any { it.kind != '#' && offset >= it.contentStart && offset <= it.contentEnd }
+    }
 }

@@ -211,13 +211,14 @@ class TeraMacroTest : BasePlatformTestCase() {
 
     fun testCompletesNamespaces() {
         val s = suggest("""{% import "macros" as m %}{% macro a() %}{% endmacro %}{{ <caret> }}""")
-        assertEquals(setOf("self", "m"), s.map { it.text }.toSet())
-        assertTrue(s.all { it.suffix == "::" })
+        val namespaces = s.filter { it.suffix == "::" }
+        assertEquals(setOf("self", "m"), namespaces.map { it.text }.toSet())
     }
 
     fun testNoNamespaceSuggestionsAfterDotOrFilterPipe() {
         assertEmpty(suggest("""{% import "macros" as m %}{{ user.<caret> }}"""))
-        assertEmpty(suggest("""{% import "macros" as m %}{{ user | <caret> }}"""))
+        val filters = suggest("""{% import "macros" as m %}{{ user | <caret> }}""")
+        assertEquals(TeraBuiltins.FILTERS.keys.toList(), filters.map { it.text })
     }
 
     fun testCompletesRemainingParameterNames() {

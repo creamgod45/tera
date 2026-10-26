@@ -87,6 +87,13 @@
 
     <depends>com.intellij.modules.lang</depends>
     <depends>com.intellij.modules.xml</depends>
+    <!-- Render context from Rust code (Template::render): RustRover / CLion, and IntelliJ IDEA's Rust plugin -->
+    <depends optional="true" config-file="tera-rust.xml">com.jetbrains.rust</depends>
+    <depends optional="true" config-file="tera-intellij-rust.xml">org.rust.lang</depends>
+
+<extensionPoints>
+        <extensionPoint qualifiedName="com.tera.contextProvider" interface="com.tera.tera.TeraContextProvider" dynamic="true"/>
+    </extensionPoints>
 
 <extensions defaultExtensionNs="com.intellij">
         <lang.ast.factory language="Tera" implementationClass="com.tera.tera.TeraAstFactory"/>

@@ -149,6 +149,9 @@ object TeraSymbolScanner {
 
     private fun isOp(t: TeraTok?, text: String) = t != null && t.type == TeraTokenTypes.OPERATOR && t.text == text
 
+    /** Macro declared by the tokens of a `{% macro name(params) %}` tag. */
+    fun macroOf(t: List<TeraTok>): MacroDef? = parseMacro(t)
+
     private fun parseMacro(t: List<TeraTok>): MacroDef? {
         val name = t.getOrNull(1)?.takeIf { it.type == TeraTokenTypes.IDENTIFIER } ?: return null
         if (!isOp(t.getOrNull(2), "(")) return null

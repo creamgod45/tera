@@ -135,6 +135,35 @@ object TeraDocumentation {
         return sb.toString()
     }
 
+    fun variableHtml(ref: TeraVariables.Ref, context: TeraContextResult?): String {
+        val r = ref.result
+        val name = ref.occurrence.segs[ref.index].name
+        val shown = r.field?.rustType ?: r.type.display()
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>(variable) ")
+            .append(esc(name)).append(": ").append(esc(shown)).append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+        r.field?.doc?.takeIf { it.isNotBlank() }?.let {
+            sb.append(DocumentationMarkup.CONTENT_START).append(para(it)).append(DocumentationMarkup.CONTENT_END)
+        }
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        section(sb, "Template type:", "<code>${esc(r.type.display())}</code>")
+        val struct = r.type as? TeraType.Struct
+        if (struct != null && struct.fields.isNotEmpty()) {
+            section(sb, "Fields:", struct.fields.take(30).joinToString("") { f ->
+                "<p><code>${esc(f.name)}</code>: ${esc(f.rustType ?: f.type.display())}</p>"
+            })
+        }
+        val source = when {
+            r.binding != null -> r.binding.detail ?: "template"
+            context != null && ref.index == 0 -> "Rust render context" +
+                context.sources.takeIf { it.isNotEmpty() }?.joinToString(", ", " (", ")").orEmpty()
+            else -> "field of the Rust render context"
+        }
+        section(sb, "Source:", esc(source))
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
     /** [templates]: file name, its text and macros, for every template the import path resolves to. */
     fun importHtml(imp: ImportDecl, templates: List<Triple<String, String, List<MacroDef>>>): String {
         val sb = StringBuilder()
@@ -166,6 +195,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         class Macro(val macro: MacroDef) : Described
         class Param(val macro: MacroDef, val param: MacroParam) : Described
         class Import(val imp: ImportDecl) : Described
+        class Variable(val ref: TeraVariables.Ref, val context: TeraContextResult?) : Described
     }
 
     private fun describe(file: PsiFile, offset: Int): Described? {
@@ -175,6 +205,9 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             m.params.firstOrNull { it.range.startOffset == offset }?.let { return Described.Param(m, it) }
         }
         symbols.imports.firstOrNull { it.aliasRange.startOffset == offset }?.let { return Described.Import(it) }
+        val context = TeraContexts.forFile(file)
+        TeraVariables.refAt(file.text, offset, context)?.takeIf { it.range.startOffset == offset }
+            ?.let { return Described.Variable(it, context) }
         return null
     }
 
@@ -200,10 +233,14 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         symbols.imports.firstOrNull { targetOffset in it.aliasRange.startOffset..it.aliasRange.endOffset }
             ?.let { return here.findElementAt(it.aliasRange.startOffset) }
 
+        // Hovering a variable use.
+        TeraVariables.refAt(here.text, targetOffset, TeraContexts.forFile(file))
+            ?.let { return here.findElementAt(it.range.startOffset) }
+
         // Hovering a use: take the first declaration navigation would offer.
         val templatesOf = { path: String -> vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty() }
         val manager = PsiManager.getInstance(file.project)
-        for (def in TeraNavigation.definitions(here.text, targetOffset, templatesOf)) {
+        for (def in TeraNavigation.definitions(here.text, targetOffset, null, templatesOf)) {
             if (def.offset < 0) continue
             val psi = if (def.file == null) here
             else manager.findFile(def.file)?.viewProvider?.getPsi(TeraLanguage) ?: continue
@@ -228,6 +265,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
                 }
                 TeraDocumentation.importHtml(d.imp, templates)
             }
+            is Described.Variable -> TeraDocumentation.variableHtml(d.ref, d.context)
             null -> null
         }
     }
@@ -242,6 +280,8 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
                 "${file.name}: ${d.macro.name}(${d.param.name}: ${TeraDocumentation.typeOf(d.param, doc)})"
             }
             is Described.Import -> "import \"${d.imp.path}\" as ${d.imp.alias}"
+            is Described.Variable -> "(variable) ${d.ref.occurrence.segs[d.ref.index].name}: " +
+                (d.ref.result.field?.rustType ?: d.ref.result.type.display())
             null -> null
         }
     }

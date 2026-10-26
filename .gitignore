@@ -54,3 +54,6 @@ $RECYCLE.BIN/
 
 ### IntelliJ IDEA - local only ###
 .idea/kotlinc.xml
+
+### JVM heap dumps ###
+*.hprof

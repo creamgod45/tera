@@ -27,6 +27,27 @@ Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
   above the macro, optionally with `@param name {type} text` lines; without a
   `{type}` the type is inferred from the default value (string, integer, float,
   boolean, array, object) or shown as `any`.
+- Variables from your Rust code (RustRover, CLion, or IDEA with the Rust plugin): for
+  `Template::render("index", ...)` the plugin finds the call that renders the open
+  template (named like Rocket does: path below `templates/`, no extension) and reads
+  the context with the Rust plugin's PSI and type inference. It understands a struct
+  (`&Context { .. }`, `Context::raw(..).await`, `&Context::default()`) including serde
+  `rename`, `rename_all`, `skip`, `flatten`, and nested `Vec`/`Option`/`HashMap`/tuples,
+  and `context! { key: value, shorthand }`. Then:
+  - `{{ ` completes the context variables with their Rust types;
+  - `task.` completes fields, including loop variables from `{% for task in tasks %}`,
+    `{% set %}` variables, macro parameters (macros do not see the context), `loop.*`,
+    `a[0].b` and `a.0`;
+  - `|` completes Tera's built-in filters, `is` the built-in tests, and the built-in
+    functions are offered;
+  - go to definition on a variable or field jumps to the Rust field; hover shows its
+    type, doc comment, source and fields;
+  - unknown variables (weak warning) and unknown fields of a known struct are reported,
+    only when every render call site was understood;
+  - a base template or partial (`extends`/`include`) uses the context of the templates
+    that use it.
+  Types from crates that are not part of the project are never guessed; the context is
+  then marked incomplete and no variable diagnostics are shown.
 - Native template data language integration: `.html.tera` uses HTML,
   `.css.tera` uses CSS, and `.js.tera` uses JavaScript when those languages are
   installed and enabled. Files without a recognized inner extension default to HTML.
@@ -43,7 +64,9 @@ an IDE that does not provide them. Macro checks only see macros defined in the f
 imports directly; macros reached through `extends` are not followed, and an
 importing file is re-checked when it is edited (not when the imported file
 changes). Tera diagnostics are structural checks, not
-a complete implementation of the Tera runtime or a Rust context type checker.
+a complete implementation of the Tera runtime. Rust context discovery is static: values
+built at run time (maps filled in a loop, `serde_json::Value`, serde `flatten` of a map)
+are reported as unknown, and templates registered with `add_raw_template` have no file.
 Template output that generates arbitrary language syntax may require additional
 context-aware handling; this plugin does not render templates or infer their output.
 
@@ -54,13 +77,18 @@ Use JDK 21 and the included Gradle wrapper:
 ```sh
 bash ./gradlew test buildPlugin
 bash ./gradlew test -PwebTests=true
+bash ./gradlew test -PrustRoverHome=/Applications/RustRover.app
 ```
 
 The default suite uses IntelliJ IDEA Community 2025.1 and checks HTML integration
 without requiring commercial web plugins. The web suite uses IntelliJ IDEA
 Ultimate 2025.1 with its bundled CSS/JavaScript plugins, runs the core tests again,
 and checks embedded language PSI, direct CSS/JS templates and code completion.
-Gradle downloads the test IDEs; the first run can take several minutes.
+The Rust suite (`-PrustRoverHome`, a local RustRover 2025.1 or newer) runs everything
+including the tests that read Rust code through the Rust plugin. Without it the Rust
+integration (`src/rust`) is compiled only if `~/Applications/RustRover.app` exists;
+otherwise the plugin is built without it. Gradle downloads the other test IDEs; the
+first run can take several minutes.
 
 The eight unmodified Rocket templates in `src/test/resources/rocket` are regression
 assets. Their source revision, checksums, expected Tera diagnostic counts, and
@@ -72,7 +100,6 @@ original assets.
 
 Reports: `build/reports/tests/test/index.html` and `build/test-results/test/`.
 A subsequent test run replaces these reports; copy them before switching suites.
-See `docs/validation.md` for the recorded validation and its limits.
 
 ## Install a local build
 

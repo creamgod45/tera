@@ -16,7 +16,11 @@ data class TeraError(
 
 // ── ExternalAnnotator ─────────────────────────────────────────────────────────
 /** File text plus the macros of every template it imports (null = import could not be resolved). */
-class TeraAnnotatorInput(val text: String, val importedMacros: Map<String, List<MacroDef>?>)
+class TeraAnnotatorInput(
+    val text: String,
+    val importedMacros: Map<String, List<MacroDef>?>,
+    val context: TeraContextResult? = null,
+)
 
 class TeraExternalAnnotator : ExternalAnnotator<TeraAnnotatorInput, List<TeraError>>() {
 
@@ -27,11 +31,12 @@ class TeraExternalAnnotator : ExternalAnnotator<TeraAnnotatorInput, List<TeraErr
         val imported = TeraSymbolScanner.scan(text).imports.associate { imp ->
             imp.path to vFile?.let { TeraImports.macrosOf(it, imp.path) }
         }
-        return TeraAnnotatorInput(text, imported)
+        return TeraAnnotatorInput(text, imported, TeraContexts.forFile(file))
     }
 
     override fun doAnnotate(input: TeraAnnotatorInput): List<TeraError> =
-        analyze(input.text) + TeraSemanticChecker.check(input.text) { input.importedMacros[it] }
+        analyze(input.text) + TeraSemanticChecker.check(input.text) { input.importedMacros[it] } +
+            TeraVariables.check(input.text, input.context)
 
     /** Syntax checks only (block structure, tag shapes); no cross-template analysis. */
     fun doAnnotate(fileText: String): List<TeraError> = analyze(fileText)

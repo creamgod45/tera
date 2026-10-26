@@ -10,7 +10,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 
 /** A place to jump to: [file] null means the current file; [offset] -1 means the file as a whole. */
-data class TeraDefinition(val file: VirtualFile?, val offset: Int)
+data class TeraDefinition(val file: VirtualFile?, val offset: Int, val element: PsiElement? = null)
 
 /** Go-to-definition for macro calls, namespaces, call arguments and template paths. */
 object TeraNavigation {
@@ -24,6 +24,7 @@ object TeraNavigation {
     fun definitions(
         text: String,
         offset: Int,
+        context: TeraContextResult? = null,
         templatesOf: (String) -> List<Pair<VirtualFile, List<MacroDef>>>,
     ): List<TeraDefinition> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
@@ -66,6 +67,12 @@ object TeraNavigation {
                 }
             }
         }
+
+        // A variable: its Rust declaration, or the `set`/`for`/macro parameter that introduced it.
+        TeraVariables.refAt(text, offset, context)?.let { ref ->
+            ref.result.field?.target?.let { result.add(TeraDefinition(null, -1, it)) }
+            ref.result.binding?.nameRange?.let { result.add(TeraDefinition(null, it.startOffset)) }
+        }
         return result.toList()
     }
 }
@@ -79,11 +86,12 @@ class TeraGotoDeclarationHandler : GotoDeclarationHandler {
         val vFile = file.originalFile.virtualFile
         val here = file.viewProvider.getPsi(TeraLanguage) ?: return null
 
-        val definitions = TeraNavigation.definitions(here.text, offset) { path ->
+        val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file)) { path ->
             vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty()
         }
         val manager = PsiManager.getInstance(project)
         val targets = definitions.mapNotNull { def ->
+            def.element?.let { return@mapNotNull it }
             val psi = if (def.file == null) here else manager.findFile(def.file)?.let {
                 it.viewProvider.getPsi(TeraLanguage) ?: it
             } ?: return@mapNotNull null
