@@ -37,6 +37,7 @@ object TeraCompletionEngine {
         importedMacros: (String) -> List<MacroDef>?,
         templateNames: () -> List<String>,
         context: TeraContextResult? = null,
+        custom: List<TeraCustomBuiltin> = emptyList(),
     ): List<TeraSuggestion> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
         val block = blocks.firstOrNull { offset >= it.contentStart && offset <= it.contentEnd } ?: return emptyList()
@@ -89,7 +90,7 @@ object TeraCompletionEngine {
         }
 
         // range(<caret>) / x | truncate(<caret>): the remaining keyword arguments of a built-in.
-        enclosingBuiltinCall(prior)?.let { (def, used) ->
+        enclosingBuiltinCall(prior, custom)?.let { (def, used) ->
             if (prior.last().let { isOp(it, "(") || isOp(it, ",") }) {
                 return def.params.filter { !def.positional && it.name !in used }.map {
                     TeraSuggestion(it.name, if (it.required) "required" else "default ${it.default ?: "none"}", "param", "=")
@@ -103,12 +104,12 @@ object TeraCompletionEngine {
         val last = prior.lastOrNull()
         if (last != null && isOp(last, ".")) return fieldSuggestions(prior, snapshot, context)
         if (last != null && isOp(last, "|")) {
-            return TeraBuiltins.FILTER_DEFS.map { builtinSuggestion(it, "filter", alwaysParens = false) }
+            return TeraBuiltins.defs("filter", custom).map { builtinSuggestion(it, "filter", alwaysParens = false) }
         }
         if (last != null && last.type == TeraTokenTypes.KEYWORD && (last.text == "is" ||
                 (last.text == "not" && prior.getOrNull(prior.size - 2)?.text == "is"))
         ) {
-            return TeraBuiltins.TEST_DEFS.map { builtinSuggestion(it, "test", alwaysParens = false) }
+            return TeraBuiltins.defs("test", custom).map { builtinSuggestion(it, "test", alwaysParens = false) }
         }
         if (last != null && isOp(last, ":")) return emptyList()
         if (block.kind == '%' && first in NO_NAMESPACE_TAGS) return emptyList()
@@ -128,7 +129,7 @@ object TeraCompletionEngine {
                 if (seen.add(v.name)) result.add(TeraSuggestion(v.name, ": ${v.rustType ?: v.type.display()}", "context"))
             }
         }
-        TeraBuiltins.FUNCTION_DEFS.forEach { result.add(builtinSuggestion(it, "function", alwaysParens = true)) }
+        TeraBuiltins.defs("function", custom).forEach { result.add(builtinSuggestion(it, "function", alwaysParens = true)) }
         val namespaces = buildList {
             if (symbols.macros.isNotEmpty()) add("self")
             symbols.imports.forEach { add(it.alias) }
@@ -146,7 +147,7 @@ object TeraCompletionEngine {
     private val CLOSE = setOf(")", "]", "}")
 
     /** The built-in function or filter whose argument list contains the caret, with the argument names already given. */
-    private fun enclosingBuiltinCall(prior: List<TeraTok>): Pair<BuiltinDef, Set<String>>? {
+    private fun enclosingBuiltinCall(prior: List<TeraTok>, custom: List<TeraCustomBuiltin>): Pair<BuiltinDef, Set<String>>? {
         var depth = 0
         for (i in prior.indices.reversed()) {
             val t = prior[i]
@@ -158,7 +159,7 @@ object TeraCompletionEngine {
             val callee = prior.getOrNull(i - 1)?.takeIf { it.type == TeraTokenTypes.IDENTIFIER } ?: return null
             val before = prior.getOrNull(i - 2)
             if (before != null && isOp(before, ":")) return null        // a macro call, handled elsewhere
-            val def = (if (before != null && isOp(before, "|")) TeraBuiltins.FILTER_BY_NAME else TeraBuiltins.FUNCTION_BY_NAME)[callee.text]
+            val def = TeraBuiltins.byName(if (before != null && isOp(before, "|")) "filter" else "function", custom)[callee.text]
                 ?: return null
             val used = mutableSetOf<String>()
             var d = 0
@@ -223,6 +224,7 @@ class TeraCompletionContributor : CompletionContributor() {
                     importedMacros = { path -> vFile?.let { TeraImports.macrosOf(it, path) } },
                     templateNames = { vFile?.let(TeraTemplateResolver::templateNames).orEmpty() },
                     context = TeraContexts.forFile(file),
+                    custom = TeraContexts.customBuiltins(file.project),
                 )
                 for (s in suggestions) {
                     var item = LookupElementBuilder.create(s.text)

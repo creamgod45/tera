@@ -25,6 +25,7 @@ object TeraNavigation {
         text: String,
         offset: Int,
         context: TeraContextResult? = null,
+        custom: List<TeraCustomBuiltin> = emptyList(),
         templatesOf: (String) -> List<Pair<VirtualFile, List<MacroDef>>>,
     ): List<TeraDefinition> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
@@ -73,6 +74,12 @@ object TeraNavigation {
             ref.result.field?.target?.let { result.add(TeraDefinition(null, -1, it)) }
             ref.result.binding?.nameRange?.let { result.add(TeraDefinition(null, it.startOffset)) }
         }
+
+        // A function, filter or test registered from Rust: its definition there.
+        TeraBuiltinRefs.at(text, offset, custom)?.let { ref ->
+            custom.firstOrNull { it.kind == ref.kind && it.def.name == ref.def.name }?.target
+                ?.let { result.add(TeraDefinition(null, -1, it)) }
+        }
         return result.toList()
     }
 }
@@ -86,7 +93,7 @@ class TeraGotoDeclarationHandler : GotoDeclarationHandler {
         val vFile = file.originalFile.virtualFile
         val here = file.viewProvider.getPsi(TeraLanguage) ?: return null
 
-        val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file)) { path ->
+        val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file), TeraContexts.customBuiltins(file.project)) { path ->
             vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty()
         }
         val manager = PsiManager.getInstance(project)

@@ -13,11 +13,15 @@ class BuiltinDef(
     val params: List<BuiltinParam> = emptyList(),
     val example: String? = null,
     val positional: Boolean = false,
+    /** Where a project-defined entry was registered (e.g. `main.rs:12`); null for Tera's own. */
+    val source: String? = null,
+    /** Longer documentation, e.g. the Rust doc comment of a registered function. */
+    val details: String? = null,
 ) {
     val required: List<BuiltinParam> get() = params.filter { it.required }
 
     fun signature(): String =
-        if (params.isEmpty() && positional.not()) name
+        if (params.isEmpty()) name
         else params.joinToString(", ", "$name(", ")") {
             when {
                 it.required || positional -> it.name
@@ -35,7 +39,21 @@ class BuiltinDef(
     }
 }
 
+/** A function, filter or test registered by the project's Rust code (`register_function` and friends). */
+class TeraCustomBuiltin(val kind: String, val def: BuiltinDef, val target: com.intellij.psi.PsiElement?)
+
 object TeraBuiltins {
+    /** The built-in definitions of [kind] (`function`, `filter` or `test`) with project-registered ones taking precedence. */
+    fun defs(kind: String, custom: List<TeraCustomBuiltin>): List<BuiltinDef> {
+        val own = custom.filter { it.kind == kind }.map { it.def }
+        val names = own.map { it.name }.toSet()
+        val base = when (kind) { "function" -> FUNCTION_DEFS; "filter" -> FILTER_DEFS; else -> TEST_DEFS }
+        return base.filter { it.name !in names } + own
+    }
+
+    fun byName(kind: String, custom: List<TeraCustomBuiltin>): Map<String, BuiltinDef> =
+        defs(kind, custom).associateBy { it.name }
+
     private fun req(name: String, doc: String) = BuiltinParam(name, true, null, doc)
     private fun opt(name: String, default: String?, doc: String) = BuiltinParam(name, false, default, doc)
     private fun pos(name: String, doc: String) = BuiltinParam(name, true, null, doc)
@@ -50,7 +68,6 @@ object TeraBuiltins {
             req("end", "first number that cannot be returned"),
         ), "{{ get_random(end=10) }}"),
         BuiltinDef("now", "current datetime", listOf(
-            opt("timezone", null, "IANA time zone name such as Europe/Berlin (needs Tera's chrono-tz feature)"),
             opt("utc", "false", "use UTC instead of the local time zone"),
             opt("timestamp", "false", "return a Unix timestamp instead of a formatted string"),
         ), "{{ now(utc=true) | date(format=\"%Y\") }}"),
@@ -82,7 +99,7 @@ object TeraBuiltins {
         ), """{{ nick | default(value="anonymous") }}"""),
         BuiltinDef("escape", "HTML-escape"),
         BuiltinDef("escape_xml", "XML-escape"),
-        BuiltinDef("filesizeformat", "human readable size"),
+        BuiltinDef("filesizeformat", "human readable size", listOf(opt("binary", "false", "use 1024-based units (KiB, MiB)"))),
         BuiltinDef("filter", "keep items matching an attribute", listOf(
             req("attribute", "attribute to test"),
             opt("value", null, "value it must equal; without it, the attribute must be truthy"),

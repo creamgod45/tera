@@ -52,6 +52,39 @@ Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
   expansion (the project's macro expansion must be enabled).
   Types from crates that are not part of the project are never guessed; the context is
   then marked incomplete and no variable diagnostics are shown.
+- Functions, filters and tests you register from Rust. The plugin looks for
+  `register_function("name", f)`, `register_filter("name", f)` and
+  `register_tester("name", f)` calls anywhere in the project (not under `target/`) and offers
+  them next to Tera's built-ins, with argument completion, hover documentation (the Rust
+  doc comment, the arguments, where it was registered) and go to definition into the Rust
+  code. A registration replaces a built-in of the same name, as it does in Tera.
+
+  ```rust
+  /// Builds an absolute URL from a route name.
+  fn url_for(args: &HashMap<String, Value>) -> tera::Result<Value> {
+      let name = args.get("name").ok_or("missing name")?;   // → argument `name`
+      let _query = args.get("query");                       // → argument `query`
+      Ok(name.clone())
+  }
+
+  fn rocket() -> _ {
+      rocket::build().attach(Template::custom(|engines| {
+          engines.tera.register_function("url_for", url_for);
+          engines.tera.register_filter("shout", |v: &Value, args: &HashMap<String, Value>| {
+              let _suffix = args.get("suffix");             // → argument `suffix`
+              Ok(v.clone())
+          });
+      }))
+  }
+  ```
+
+  then `{{ url_for(name="home") }}` and `{{ title | shout(suffix="!") }}` complete, document
+  and navigate. Recognised forms of the second argument: a function (also via `Box::new`),
+  a closure, a factory call such as `make_url_for(urls)` that returns a closure, and a value
+  whose type has `impl Function for T` / `impl Filter for T` / `impl Test for T`. The name
+  may be a string literal or a `const NAME: &str`. Arguments are the names read through
+  `args.get("x")`, `args["x"]` or `try_get_value!`; whether an argument is required is not
+  inferred, so none is inserted for you. Tests take positional arguments, so none are offered.
 - Native template data language integration: `.html.tera` uses HTML,
   `.css.tera` uses CSS, and `.js.tera` uses JavaScript when those languages are
   installed and enabled. Files without a recognized inner extension default to HTML.
@@ -68,7 +101,7 @@ an IDE that does not provide them. Macro checks only see macros defined in the f
 imports directly; macros reached through `extends` are not followed, and an
 importing file is re-checked when it is edited (not when the imported file
 changes). Tera diagnostics are structural checks, not
-a complete implementation of the Tera runtime. Rust context discovery is static: values
+a complete implementation of the Tera runtime. Rust discovery is static: values
 built at run time (maps filled in a loop, `serde_json::Value`, serde `flatten` of a map)
 are reported as unknown, and templates registered with `add_raw_template` have no file.
 Template output that generates arbitrary language syntax may require additional

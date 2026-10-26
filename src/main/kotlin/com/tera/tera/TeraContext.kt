@@ -61,6 +61,9 @@ class TeraContextResult(
 interface TeraContextProvider {
     fun resolve(project: Project, template: VirtualFile): TeraContextResult?
 
+    /** Functions, filters and tests the project registers with the template engine. */
+    fun customBuiltins(project: Project): List<TeraCustomBuiltin> = emptyList()
+
     companion object {
         val EP: ExtensionPointName<TeraContextProvider> = ExtensionPointName.create("com.tera.contextProvider")
     }
@@ -128,6 +131,24 @@ object TeraContexts {
             INHERIT.findAll(text).any { m -> target in TeraTemplateResolver.resolveAll(other, m.groupValues[1]) }
         }
     }
+
+    /** Project-registered functions, filters and tests from all providers, cached until any PSI changes. */
+    fun customBuiltins(project: Project): List<TeraCustomBuiltin> =
+        CachedValuesManager.getManager(project).getCachedValue(project) {
+            CachedValueProvider.Result.create(
+                providers().flatMap { p ->
+                    try {
+                        p.customBuiltins(project)
+                    } catch (e: ProcessCanceledException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        LOG.warn("Tera context provider ${p.javaClass.name} failed", e)
+                        emptyList()
+                    }
+                },
+                PsiModificationTracker.MODIFICATION_COUNT,
+            )
+        }
 
     fun merge(results: List<TeraContextResult>, forceIncomplete: Boolean = false): TeraContextResult? {
         if (results.isEmpty()) return null

@@ -9,7 +9,10 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
+import com.tera.tera.BuiltinDef
+import com.tera.tera.BuiltinParam
 import com.tera.tera.TeraContextProvider
+import com.tera.tera.TeraCustomBuiltin
 import com.tera.tera.TeraContextResult
 import com.tera.tera.TeraField
 import com.tera.tera.TeraType
@@ -17,6 +20,9 @@ import org.rust.lang.core.psi.RsArrayType
 import org.rust.lang.core.psi.RsCallExpr
 import org.rust.lang.core.psi.RsExpr
 import org.rust.lang.core.psi.RsFunction
+import org.rust.lang.core.psi.RsImplItem
+import org.rust.lang.core.psi.RsLambdaExpr
+import org.rust.lang.core.psi.RsMethodCall
 import org.rust.lang.core.psi.RsLetDecl
 import org.rust.lang.core.psi.RsMacroCall
 import org.rust.lang.core.psi.RsMacroExpr
@@ -73,6 +79,9 @@ class TeraRustContextProvider : TeraContextProvider {
         }
         return TeraContextResult(vars.values.toList(), complete, sources)
     }
+
+    override fun customBuiltins(project: Project): List<TeraCustomBuiltin> =
+        if (DumbService.isDumb(project)) emptyList() else RustCustomBuiltins.find(project)
 
     /** Rocket names a template by its path below `templates/`, without any extension. */
     internal fun templateName(template: VirtualFile): String {
@@ -414,7 +423,7 @@ internal object RustTypes {
     private fun serdeValue(attrs: String, key: String): String? =
         Regex("""\b$key\s*=\s*"([^"]+)"""").find(attrs)?.groupValues?.get(1)
 
-    private fun docOf(text: String): String? =
+    internal fun docOf(text: String): String? =
         text.lines().map { it.trim() }.filter { it.startsWith("///") }.joinToString("\n") { it.removePrefix("///").trim() }
             .ifBlank { null }
 
@@ -466,5 +475,134 @@ internal object RustTypes {
         val let = PsiTreeUtil.getParentOfType(binding, RsLetDecl::class.java) ?: return TeraType.Unknown
         let.typeReference?.let { return fromRef(it, 0, emptySet()) }
         return let.expr?.let { guess(it.text, anchor) } ?: TeraType.Unknown
+    }
+}
+
+
+/**
+ * Functions, filters and tests the project registers with Tera, found from the calls
+ * `tera.register_function("name", f)`, `register_filter` and `register_tester`. This is how they appear in
+ * Rocket (`Template::custom(|engines| engines.tera.register_function(..))`) and in plain Tera setups. The
+ * second argument may be a function, a closure, a factory call returning a closure (`make_url_for(urls)`) or a
+ * value whose type implements `Function`/`Filter`/`Test`; keyword arguments are read from `args.get("x")`.
+ */
+internal object RustCustomBuiltins {
+    private val CALL = Regex("""\.\s*register_(function|filter|tester)\s*\(\s*(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*,""")
+    private val KINDS = mapOf("function" to "function", "filter" to "filter", "tester" to "test")
+
+    fun find(project: Project): List<TeraCustomBuiltin> {
+        val found = linkedMapOf<Pair<String, String>, TeraCustomBuiltin>()
+        val files = FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))
+        val sources = files.filter { "/target/" !in it.path }.map { it to textOf(it) }
+        val consts = Regex("""\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*&(?:\s*'static)?\s*str\s*=\s*"([^"]*)"""")
+            .let { re -> sources.flatMap { (_, t) -> re.findAll(t).map { it.groupValues[1] to it.groupValues[2] }.toList() }.toMap() }
+        for ((vf, text) in sources) {
+            val matches = CALL.findAll(text).toList()
+            if (matches.isEmpty()) continue
+            val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
+            for (m in matches) {
+                val kind = KINDS.getValue(m.groupValues[1])
+                val name = m.groupValues[2].ifEmpty { consts[m.groupValues[3]] } ?: continue
+                val at = m.range.first + m.value.indexOf("register_")
+                val leaf = psi.findElementAt(at) ?: continue
+                val call = PsiTreeUtil.getParentOfType(leaf, RsMethodCall::class.java, false) ?: continue
+                val args = call.valueArgumentList.exprList
+                val line = text.substring(0, m.range.first).count { it == '\n' } + 1
+                val callee = calleeOf(args.getOrNull(1), kind, args.getOrNull(0))
+                val source = "${vf.name}:$line"
+                val doc = callee?.doc
+                val description = doc?.lineSequence()?.firstOrNull { it.isNotBlank() } ?: "registered in Rust ($source)"
+                val params = if (kind == "test") emptyList() else (callee?.args.orEmpty()).map {
+                    BuiltinParam(it, false, null, "argument read by the Rust code")
+                }
+                val def = BuiltinDef(name, description, params, positional = kind == "test", source = source, details = doc)
+                found[kind to name] = TeraCustomBuiltin(kind, def, callee?.target ?: args.getOrNull(0))
+            }
+        }
+        return found.values.toList()
+    }
+
+    private fun textOf(vf: com.intellij.openapi.vfs.VirtualFile) =
+        com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
+            ?: String(vf.contentsToByteArray(), vf.charset)
+
+    private class Callee(val doc: String?, val target: PsiElement?, val args: List<String>)
+
+    private fun calleeOf(expr0: RsExpr?, kind: String, nameLiteral: PsiElement?): Callee? {
+        var expr: PsiElement = expr0 ?: return null
+        // Box::new(f)
+        if (expr is RsCallExpr && (expr.expr as? RsPathExpr)?.path?.text?.endsWith("Box::new") == true) {
+            expr = expr.valueArgumentList.exprList.firstOrNull() ?: return null
+        }
+        return try {
+            when (expr) {
+                is RsLambdaExpr -> Callee(null, nameLiteral, argNames(expr.text, kind))
+                is RsPathExpr -> {
+                    val target = (expr.path.reference?.resolve() as? RsFunction)
+                        ?: expr.path.referenceName?.let { functionByName(expr, it) }
+                    if (target != null) fromFunction(target, kind) else implOf(expr, expr.path.referenceName, kind)
+                }
+                is RsCallExpr -> {
+                    val path = (expr.expr as? RsPathExpr)?.path
+                    val target = (path?.reference?.resolve() as? RsFunction)
+                        ?: path?.referenceName?.let { functionByName(expr, it) }
+                    if (target != null && path?.path == null) fromFunction(target, kind)
+                    else implOf(expr, path?.path?.referenceName ?: path?.referenceName, kind)
+                        ?: target?.let { fromFunction(it, kind) }
+                }
+                is RsStructLiteral -> implOf(expr, expr.path.referenceName, kind)
+                else -> null
+            }
+        } catch (e: ProcessCanceledException) { throw e } catch (e: Exception) { null }
+    }
+
+    private fun fromFunction(fn: RsFunction, kind: String) =
+        Callee(RustTypes.docOf(fn.text), fn.identifier, argNames(fn.text, kind))
+
+    private fun functionByName(context: PsiElement, name: String): RsFunction? {
+        val project = context.project
+        val pattern = Regex("""\bfn\s+${Regex.escape(name)}\b""")
+        for (vf in FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))) {
+            if ("/target/" in vf.path) continue
+            val m = pattern.find(textOf(vf)) ?: continue
+            val leaf = PsiManager.getInstance(project).findFile(vf)?.findElementAt(m.range.last) ?: continue
+            PsiTreeUtil.getParentOfType(leaf, RsFunction::class.java, false)?.takeIf { it.name == name }?.let { return it }
+        }
+        return null
+    }
+
+    /** `impl Function for Type { fn call(&self, args: ..) }` (or Filter/Test) for the type used as the second argument. */
+    private fun implOf(context: PsiElement, typeName: String?, kind: String): Callee? {
+        typeName ?: return null
+        val trait = when (kind) { "function" -> "Function"; "filter" -> "Filter"; else -> "Test" }
+        val pattern = Regex("""\bimpl\s+(?:[A-Za-z_:]*::)?$trait\s+for\s+${Regex.escape(typeName)}\b""")
+        val project = context.project
+        for (vf in FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))) {
+            if ("/target/" in vf.path) continue
+            val m = pattern.find(textOf(vf)) ?: continue
+            val leaf = PsiManager.getInstance(project).findFile(vf)?.findElementAt(m.range.first) ?: continue
+            val impl = PsiTreeUtil.getParentOfType(leaf, RsImplItem::class.java, false) ?: continue
+            return Callee(RustTypes.docOf(impl.text), impl, argNames(impl.text, kind))
+        }
+        return null
+    }
+
+    /** Keyword names the code reads from its argument map: `args.get("x")`, `args["x"]`, `try_get_value!("f", "x", ..)`. */
+    fun argNames(code: String, kind: String): List<String> {
+        if (kind == "test") return emptyList()
+        val typed = Regex("""(\w+)\s*:\s*&\s*(?:std::collections::)?HashMap\s*<\s*String\s*,\s*(?:[\w:]*::)?Value\s*>""")
+            .findAll(code).map { it.groupValues[1] }.toList()
+        val receivers = (typed + listOf("args", "kwargs")).distinct()
+        val found = mutableListOf<Pair<Int, String>>()      // position, name: keep the order of appearance
+        for (r in receivers) {
+            val q = Regex.escape(r)
+            Regex("""\b$q\s*\.\s*(?:get|get_mut|remove|contains_key)\s*\(\s*"(\w+)"""").findAll(code)
+                .forEach { found.add(it.range.first to it.groupValues[1]) }
+            Regex("""\b$q\s*\[\s*"(\w+)"\s*\]""").findAll(code).forEach { found.add(it.range.first to it.groupValues[1]) }
+        }
+        Regex("""try_get_value!\s*\(\s*"[^"]*"\s*,\s*"(\w+)"""").findAll(code).forEach { found.add(it.range.first to it.groupValues[1]) }
+        val names = linkedSetOf<String>().apply { found.sortedBy { it.first }.forEach { add(it.second) } }
+        if (kind == "filter") names.remove("value")
+        return names.toList()
     }
 }

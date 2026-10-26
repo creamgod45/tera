@@ -18,7 +18,7 @@ class TeraBuiltinsTest : BasePlatformTestCase() {
     fun testSignaturesOfFunctions() {
         fun sig(n: String) = TeraBuiltins.FUNCTION_BY_NAME.getValue(n).signature()
         assertEquals("range(end, start=0, step_by=1)", sig("range"))
-        assertEquals("now(timezone=…, utc=false, timestamp=false)", sig("now"))
+        assertEquals("now(utc=false, timestamp=false)", sig("now"))
         assertEquals("throw(message)", sig("throw"))
         assertEquals("get_random(start=0, end)", sig("get_random"))
         assertEquals("get_env(name, default=…)", sig("get_env"))

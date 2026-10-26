@@ -22,7 +22,7 @@ object TeraBuiltinRefs {
     private val SKIPPED_TAGS = setOf("macro", "endmacro", "import", "extends", "include", "block", "endblock")
 
     /** The built-in named by the token under [offset], decided by how it is written (`|`, `is`, `name(`). */
-    fun at(text: String, offset: Int): BuiltinRef? {
+    fun at(text: String, offset: Int, custom: List<TeraCustomBuiltin> = emptyList()): BuiltinRef? {
         for (block in TeraSymbolScanner.scanBlocks(text)) {
             if (offset < block.contentStart || offset > block.contentEnd) continue
             val t = block.tokens
@@ -37,11 +37,11 @@ object TeraBuiltinRefs {
             fun kw(x: TeraTok?, s: String) = x != null && x.type == TeraTokenTypes.KEYWORD && x.text == s
             return when {
                 op(prev, "|") || (block.kind == '%' && first == "filter" && i == 1) ->
-                    TeraBuiltins.FILTER_BY_NAME[name]?.let { BuiltinRef(it, "filter", t[i]) }
+                    TeraBuiltins.byName("filter", custom)[name]?.let { BuiltinRef(it, "filter", t[i]) }
                 kw(prev, "is") || (kw(prev, "not") && kw(t.getOrNull(i - 2), "is")) ->
-                    TeraBuiltins.TEST_BY_NAME[name]?.let { BuiltinRef(it, "test", t[i]) }
+                    TeraBuiltins.byName("test", custom)[name]?.let { BuiltinRef(it, "test", t[i]) }
                 op(next, "(") && !op(prev, ".") && !op(prev, ":") ->
-                    TeraBuiltins.FUNCTION_BY_NAME[name]?.let { BuiltinRef(it, "function", t[i]) }
+                    TeraBuiltins.byName("function", custom)[name]?.let { BuiltinRef(it, "function", t[i]) }
                 else -> null
             }
         }
@@ -175,8 +175,9 @@ object TeraDocumentation {
         sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>(").append(ref.kind).append(") ")
             .append(esc(def.signature())).append("</pre>").append(DocumentationMarkup.DEFINITION_END)
         sb.append(DocumentationMarkup.CONTENT_START)
-            .append(esc(def.description.replaceFirstChar(Char::uppercaseChar))).append(".")
-            .append(DocumentationMarkup.CONTENT_END)
+        if (def.details != null) sb.append(para(def.details))
+        else sb.append(esc(def.description.replaceFirstChar(Char::uppercaseChar))).append(".")
+        sb.append(DocumentationMarkup.CONTENT_END)
         sb.append(DocumentationMarkup.SECTIONS_START)
         if (def.params.isNotEmpty()) {
             val body = StringBuilder()
@@ -197,7 +198,7 @@ object TeraDocumentation {
             section(sb, "Arguments:", "none")
         }
         def.example?.let { section(sb, "Example:", "<code>${esc(it)}</code>") }
-        section(sb, "Source:", "Tera built-in ${esc(ref.kind)}")
+        section(sb, "Source:", def.source?.let { "registered in Rust (${esc(it)})" } ?: "Tera built-in ${esc(ref.kind)}")
         sb.append(DocumentationMarkup.SECTIONS_END)
         return sb.toString()
     }
@@ -273,7 +274,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             m.params.firstOrNull { it.range.startOffset == offset }?.let { return Described.Param(m, it) }
         }
         symbols.imports.firstOrNull { it.aliasRange.startOffset == offset }?.let { return Described.Import(it) }
-        TeraBuiltinRefs.at(file.text, offset)?.takeIf { it.token.range.startOffset == offset }
+        TeraBuiltinRefs.at(file.text, offset, TeraContexts.customBuiltins(file.project))?.takeIf { it.token.range.startOffset == offset }
             ?.let { return Described.Builtin(it) }
         val context = TeraContexts.forFile(file)
         TeraVariables.refAt(file.text, offset, context)?.takeIf { it.range.startOffset == offset }
@@ -304,7 +305,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             ?.let { return here.findElementAt(it.aliasRange.startOffset) }
 
         // Hovering a built-in function, filter or test.
-        TeraBuiltinRefs.at(here.text, targetOffset)?.let { return here.findElementAt(it.token.range.startOffset) }
+        TeraBuiltinRefs.at(here.text, targetOffset, TeraContexts.customBuiltins(file.project))?.let { return here.findElementAt(it.token.range.startOffset) }
 
         // Hovering a variable use.
         TeraVariables.refAt(here.text, targetOffset, TeraContexts.forFile(file))
@@ -313,7 +314,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         // Hovering a use: take the first declaration navigation would offer.
         val templatesOf = { path: String -> vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty() }
         val manager = PsiManager.getInstance(file.project)
-        for (def in TeraNavigation.definitions(here.text, targetOffset, null, templatesOf)) {
+        for (def in TeraNavigation.definitions(here.text, targetOffset, null, emptyList(), templatesOf)) {
             if (def.offset < 0) continue
             val psi = if (def.file == null) here
             else manager.findFile(def.file)?.viewProvider?.getPsi(TeraLanguage) ?: continue
