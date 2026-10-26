@@ -7,6 +7,14 @@ Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
 - Tera syntax highlighting, including whitespace control (`{%-`, `-%}`, `{{-`,
   `-}}`, `{#-`, `-#}`).
 - Block/delimiter diagnostics, with optional names on `endmacro` and `endblock`.
+- Macro analysis across templates: `{% import "macros" as m %}` is resolved
+  Rocket-style (relative to the nearest `templates` folder, extensions optional)
+  and `self::` refers to the current file. Calls such as `m::input(...)` are checked
+  for unknown macros/namespaces, unknown, duplicate, positional and missing
+  required arguments, duplicate macro/parameter names, and unresolvable imports.
+- Completion: macro names after `ns::` (inserted with their required arguments),
+  parameter names inside a call, import aliases and `self`, tag keywords after
+  `{%`, and template names inside `import`/`extends`/`include` strings.
 - Native template data language integration: `.html.tera` uses HTML,
   `.css.tera` uses CSS, and `.js.tera` uses JavaScript when those languages are
   installed and enabled. Files without a recognized inner extension default to HTML.
@@ -19,7 +27,10 @@ Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
 
 HTML support is required. CSS/JavaScript features depend on the host IDE's
 language plugins; installing this plugin does not add WebStorm's services to
-an IDE that does not provide them. Tera diagnostics are structural checks, not
+an IDE that does not provide them. Macro checks only see macros defined in the file itself and in templates it
+imports directly; macros reached through `extends` are not followed, and an
+importing file is re-checked when it is edited (not when the imported file
+changes). Tera diagnostics are structural checks, not
 a complete implementation of the Tera runtime or a Rust context type checker.
 Template output that generates arbitrary language syntax may require additional
 context-aware handling; this plugin does not render templates or infer their output.

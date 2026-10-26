@@ -48,6 +48,7 @@ intellijPlatform {
 
         changeNotes = """
             Fix false errors for whitespace-trimming delimiters and named endmacro/endblock tags.
+            Check macro calls against definitions (including import "..." as alias) and add macro, argument, namespace, keyword and template-name completion.
             Integrate native template data language parsing and highlighting for HTML, CSS and JavaScript.
         """.trimIndent()
     }

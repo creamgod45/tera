@@ -110,6 +110,10 @@
         <externalAnnotator language="Tera"
                             implementationClass="com.tera.tera.TeraExternalAnnotator"/>
 
+        <!-- 宏 / import 补全 -->
+        <completion.contributor language="any"
+                                implementationClass="com.tera.tera.TeraCompletionContributor"/>
+
         <!-- 语法高亮工厂 -->
         <lang.syntaxHighlighterFactory language="Tera"
                                         implementationClass="com.tera.tera.TeraSyntaxHighlighterFactory"/>
