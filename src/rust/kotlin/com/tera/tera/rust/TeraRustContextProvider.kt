@@ -28,10 +28,12 @@ import org.rust.lang.core.psi.RsTypeReference
 import org.rust.lang.core.psi.RsValueParameter
 import org.rust.lang.core.psi.RsPathExpr
 import org.rust.lang.core.psi.RsPatBinding
+import org.rust.lang.core.macros.findMacroCallExpandedFrom
 import org.rust.lang.core.psi.RsStructItem
 import org.rust.lang.core.psi.RsStructLiteral
 import org.rust.lang.core.psi.RsUnaryExpr
 import org.rust.lang.core.psi.ext.RsStructOrEnumItemElement
+import org.rust.lang.core.psi.ext.expansionFlatten
 import org.rust.lang.core.types.ty.Ty
 import org.rust.lang.core.types.ty.TyAdt
 import org.rust.lang.core.types.ty.TyArray
@@ -224,6 +226,31 @@ internal object RustTypes {
             val leaf = psi.findElementAt(m.range.last) ?: continue
             PsiTreeUtil.getParentOfType(leaf, RsStructItem::class.java, false)?.takeIf { it.name == name }?.let { return it }
         }
+        return structFromMacroExpansion(context, name)
+    }
+
+    /**
+     * `struct Name` does not appear in the source when a `macro_rules!` call generates it: look through the
+     * expansions of macro calls that mention the name. Needs the Rust plugin's macro expansion to be enabled.
+     */
+    private fun structFromMacroExpansion(context: PsiElement, name: String): RsStructItem? {
+        val project = context.project
+        val files = listOfNotNull(context.containingFile?.virtualFile) +
+            FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))
+        for (vf in files.distinct()) {
+            if ("/target/" in vf.path) continue
+            val text = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
+                ?: String(vf.contentsToByteArray(), vf.charset)
+            if (!Regex("""\b${Regex.escape(name)}\b""").containsMatchIn(text)) continue
+            val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
+            for (call in PsiTreeUtil.findChildrenOfType(psi, RsMacroCall::class.java)) {
+                if (!call.text.contains(name)) continue
+                val found = try {
+                    call.expansionFlatten.filterIsInstance<RsStructItem>().firstOrNull { it.name == name }
+                } catch (e: ProcessCanceledException) { throw e } catch (e: Exception) { null }
+                if (found != null) return found
+            }
+        }
         return null
     }
 
@@ -288,9 +315,26 @@ internal object RustTypes {
         }
     }
 
+    /** Items produced by a macro belong to the project when the macro call does, not the synthetic expansion file. */
     private fun inProject(item: PsiElement): Boolean {
-        val vf = item.containingFile?.virtualFile ?: return false
+        val site = originOf(item)
+        val vf = site.containingFile?.virtualFile ?: return false
         return com.intellij.openapi.roots.ProjectFileIndex.getInstance(item.project).isInContent(vf)
+    }
+
+    /** The macro call an expanded element comes from, else the element itself. */
+    private fun originOf(element: PsiElement): PsiElement =
+        try { element.findMacroCallExpandedFrom() ?: element } catch (e: ProcessCanceledException) { throw e } catch (e: Exception) { element }
+
+    /** A declaration to navigate to; for macro-generated fields the call site instead of the expansion file. */
+    fun navigationTarget(leaf: PsiElement): PsiElement {
+        val project = leaf.project
+        val index = com.intellij.openapi.roots.ProjectFileIndex.getInstance(project)
+        fun inContent(e: PsiElement) = e.containingFile?.virtualFile?.let(index::isInContent) == true
+        if (inContent(leaf)) return leaf
+        val mapped = try { leaf.navigationElement } catch (e: ProcessCanceledException) { throw e } catch (e: Exception) { leaf }
+        if (inContent(mapped)) return mapped
+        return originOf(leaf).takeIf(::inContent) ?: leaf
     }
 
     /**
@@ -362,7 +406,7 @@ internal object RustTypes {
             }
             val renamed = serdeValue(attrs, "rename") ?: serdeValue(attrs, "serialize")
                 ?: rule?.let { serdeRename(it, rustName) } ?: rustName
-            out.add(TeraField(renamed, type, field.typeReference?.text, docOf(field.text), field.identifier))
+            out.add(TeraField(renamed, type, field.typeReference?.text, docOf(field.text), navigationTarget(field.identifier)))
         }
         return StructInfo(out, exact)
     }
