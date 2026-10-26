@@ -157,6 +157,10 @@ object TeraCompletionEngine {
     }
 }
 
+/** Tail text that starts like a signature (`: Type`, `(args)`) hugs the name; descriptions get a gap. */
+internal fun displayTail(tail: String): String =
+    if (tail.startsWith(":") || tail.startsWith("(") || tail.startsWith(" ")) tail else "  $tail"
+
 class TeraCompletionContributor : CompletionContributor() {
     init {
         extend(CompletionType.BASIC, PlatformPatterns.psiElement(), object : CompletionProvider<CompletionParameters>() {
@@ -174,7 +178,7 @@ class TeraCompletionContributor : CompletionContributor() {
                 )
                 for (s in suggestions) {
                     var item = LookupElementBuilder.create(s.text)
-                    if (s.tail.isNotEmpty()) item = item.withTailText(s.tail, true)
+                    if (s.tail.isNotEmpty()) item = item.withTailText(displayTail(s.tail), true)
                     if (s.type.isNotEmpty()) item = item.withTypeText(s.type, true)
                     if (s.suffix.isNotEmpty()) {
                         item = item.withInsertHandler { ctx, _ ->

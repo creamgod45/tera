@@ -338,4 +338,31 @@ class TeraContextTest : BasePlatformTestCase() {
         myFixture.completeBasic()
         assertTrue(myFixture.editor.document.text.contains("tasks"))
     }
+
+    // ── presentation ─────────────────────────────────────────────────────────
+
+    fun testDescriptionsAreSeparatedFromTheNameInTheLookupList() {
+        install("index.html.tera" to todoContext())
+        val file = myFixture.addFileToProject("templates/index.html.tera", "{{  }}")
+        myFixture.configureFromExistingVirtualFile(file.virtualFile)
+        myFixture.editor.caretModel.moveToOffset(3)
+        myFixture.completeBasic()
+        val items = myFixture.lookup.items
+        fun tail(name: String): String {
+            val p = com.intellij.codeInsight.lookup.LookupElementPresentation()
+            items.first { it.lookupString == name }.renderElement(p)
+            return p.tailText.orEmpty()
+        }
+        assertEquals("  read an environment variable", tail("get_env"))
+        assertEquals("  current datetime", tail("now"))
+        assertEquals(": Vec<Task>", tail("tasks"))
+    }
+
+    fun testDisplayTailRules() {
+        assertEquals(": Vec<Task>", displayTail(": Vec<Task>"))
+        assertEquals("(a, b=\"x\")", displayTail("(a, b=\"x\")"))
+        assertEquals("  uppercase", displayTail("uppercase"))
+        assertEquals("  macros", displayTail("macros"))
+        assertEquals("  already", displayTail("  already"))
+    }
 }
