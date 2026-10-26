@@ -43,16 +43,23 @@ class BuiltinDef(
 class TeraCustomBuiltin(val kind: String, val def: BuiltinDef, val target: com.intellij.psi.PsiElement?)
 
 object TeraBuiltins {
-    /** The built-in definitions of [kind] (`function`, `filter` or `test`) with project-registered ones taking precedence. */
-    fun defs(kind: String, custom: List<TeraCustomBuiltin>): List<BuiltinDef> {
+    /**
+     * The definitions of [kind] (`function`, `filter` or `test`) for [version], with project-registered ones
+     * taking precedence over Tera's own of the same name.
+     */
+    fun defs(kind: String, custom: List<TeraCustomBuiltin>, version: TeraVersion = TeraVersion.V1): List<BuiltinDef> {
         val own = custom.filter { it.kind == kind }.map { it.def }
         val names = own.map { it.name }.toSet()
-        val base = when (kind) { "function" -> FUNCTION_DEFS; "filter" -> FILTER_DEFS; else -> TEST_DEFS }
-        return base.filter { it.name !in names } + own
+        return base(kind, version).filter { it.name !in names } + own
     }
 
-    fun byName(kind: String, custom: List<TeraCustomBuiltin>): Map<String, BuiltinDef> =
-        defs(kind, custom).associateBy { it.name }
+    fun byName(kind: String, custom: List<TeraCustomBuiltin>, version: TeraVersion = TeraVersion.V1): Map<String, BuiltinDef> =
+        defs(kind, custom, version).associateBy { it.name }
+
+    fun base(kind: String, version: TeraVersion): List<BuiltinDef> = when (version) {
+        TeraVersion.V1 -> when (kind) { "function" -> FUNCTION_DEFS; "filter" -> FILTER_DEFS; else -> TEST_DEFS }
+        TeraVersion.V2 -> when (kind) { "function" -> FUNCTION_DEFS_V2; "filter" -> FILTER_DEFS_V2; else -> TEST_DEFS_V2 }
+    }
 
     private fun req(name: String, doc: String) = BuiltinParam(name, true, null, doc)
     private fun opt(name: String, default: String?, doc: String) = BuiltinParam(name, false, default, doc)
@@ -191,6 +198,143 @@ object TeraBuiltins {
         BuiltinDef("undefined", "variable does not exist"),
     )
 
+    // ── Tera 2.x, from the tera 2.4.0 crate ──────────────────────────────────
+
+    val FUNCTION_DEFS_V2: List<BuiltinDef> = listOf(
+        BuiltinDef("range", "generate a number sequence", listOf(
+            req("end", "first integer that is not in the array"),
+            opt("start", "0", "first integer of the array"),
+            opt("step_by", "1", "step between two integers, may be negative"),
+        ), "{% for i in range(start=1, end=4) %}{{ i }}{% endfor %}"),
+        BuiltinDef("throw", "abort rendering with a message", listOf(
+            req("message", "why rendering failed"),
+        ), """{{ throw(message="missing title") }}"""),
+    )
+
+    val FILTER_DEFS_V2: List<BuiltinDef> = listOf(
+        BuiltinDef("abs", "absolute value"),
+        BuiltinDef("capitalize", "uppercase the first character, lowercase the rest"),
+        BuiltinDef("default", "fallback value when undefined", listOf(
+            req("value", "value to use"),
+            opt("boolean", "false", "also use the value when the input is falsy"),
+        ), """{{ nick | default(value="anonymous") }}"""),
+        BuiltinDef("escape", "escape for the current output format"),
+        BuiltinDef("escape_html", "HTML-escape"),
+        BuiltinDef("escape_xml", "XML-escape"),
+        BuiltinDef("first", "first element, none when empty"),
+        BuiltinDef("float", "convert to float"),
+        BuiltinDef("get", "get a key from a map", listOf(
+            req("key", "key to read, may be a path such as a.b"),
+            opt("default", null, "value when the key is missing"),
+        ), """{{ values | get(key="name") }}"""),
+        BuiltinDef("group_by", "group an array by an attribute", listOf(req("attribute", "attribute path to group on")),
+            """{% for key, items in tasks | group_by(attribute="status") %}"""),
+        BuiltinDef("indent", "indent lines", listOf(
+            opt("width", "4", "number of indentation characters"),
+            opt("indentation", null, "indentation text, a space by default"),
+            opt("first", "false", "also indent the first line"),
+            opt("blank", "false", "also indent blank lines"),
+        ), "{{ text | indent(width=2) }}"),
+        BuiltinDef("int", "convert to integer", listOf(opt("base", "10", "number base of the input"))),
+        BuiltinDef("join", "join array with a separator", listOf(opt("sep", null, "separator between items")),
+            """{{ tags | join(sep=", ") }}"""),
+        BuiltinDef("keys", "keys of a map"),
+        BuiltinDef("last", "last element, none when empty"),
+        BuiltinDef("length", "length of string, array or map"),
+        BuiltinDef("lower", "lowercase"),
+        BuiltinDef("newlines_to_br", "newlines to <br>"),
+        BuiltinDef("nth", "nth element, none when out of range", listOf(req("n", "zero-based position"))),
+        BuiltinDef("pairs", "key and value pairs of a map"),
+        BuiltinDef("pluralize", "plural suffix by count", listOf(
+            opt("singular", "\"\"", "suffix when the number is 1"),
+            opt("plural", "\"s\"", "suffix otherwise"),
+        ), """field{{ errors | length | pluralize }}"""),
+        BuiltinDef("replace", "replace text", listOf(
+            req("from", "text to find"),
+            req("to", "replacement"),
+        ), """{{ name | replace(from="a", to="b") }}"""),
+        BuiltinDef("reverse", "reverse array or string"),
+        BuiltinDef("round", "round a number", listOf(
+            opt("method", null, "ceil or floor; omit for ordinary rounding"),
+            opt("precision", "0", "digits after the decimal point"),
+        )),
+        BuiltinDef("safe", "mark as safe, skip escaping"),
+        BuiltinDef("sort", "sort array", listOf(opt("attribute", null, "attribute to sort objects by"))),
+        BuiltinDef("split", "split into array", listOf(req("pat", "separator"))),
+        BuiltinDef("str", "convert to string"),
+        BuiltinDef("title", "uppercase the first letter of each word"),
+        BuiltinDef("trim", "trim whitespace, or a pattern from both ends", listOf(opt("pat", null, "text to remove instead of whitespace"))),
+        BuiltinDef("trim_end", "trim trailing whitespace or a pattern", listOf(opt("pat", null, "text to remove instead of whitespace"))),
+        BuiltinDef("trim_start", "trim leading whitespace or a pattern", listOf(opt("pat", null, "text to remove instead of whitespace"))),
+        BuiltinDef("truncate", "shorten to a length", listOf(
+            req("length", "maximum number of characters"),
+            opt("end", "\"…\"", "text appended when shortened"),
+        ), "{{ title | truncate(length=20) }}"),
+        BuiltinDef("unique", "remove duplicates"),
+        BuiltinDef("upper", "uppercase"),
+        BuiltinDef("values", "values of a map"),
+        BuiltinDef("wordcount", "count words"),
+    )
+
+    val TEST_DEFS_V2: List<BuiltinDef> = listOf(
+        BuiltinDef("array", "is an array"),
+        BuiltinDef("bool", "is a boolean"),
+        BuiltinDef("containing", "contains a value", listOf(req("pat", "value to look for")), "{% if tags is containing(pat=\"rust\") %}"),
+        BuiltinDef("defined", "variable exists"),
+        BuiltinDef("divisible_by", "divisible by a number", listOf(req("divisor", "number to divide by")),
+            "{% if i is divisible_by(divisor=2) %}"),
+        BuiltinDef("ending_with", "string suffix", listOf(req("pat", "expected ending"))),
+        BuiltinDef("even", "even number"),
+        BuiltinDef("float", "is a float"),
+        BuiltinDef("integer", "is an integer"),
+        BuiltinDef("iterable", "array or string"),
+        BuiltinDef("map", "is a map"),
+        BuiltinDef("none", "is none"),
+        BuiltinDef("number", "is a number"),
+        BuiltinDef("odd", "odd number"),
+        BuiltinDef("starting_with", "string prefix", listOf(req("pat", "expected beginning"))),
+        BuiltinDef("string", "is a string"),
+        BuiltinDef("undefined", "variable does not exist"),
+    )
+
+    /**
+     * What the separate `tera-contrib` crate offers. Nothing here exists until the project registers it, e.g.
+     * `tera.register_filter("date", tera_contrib::dates::date)`, so these only enrich registrations the plugin finds.
+     * Keyed by the Rust item name.
+     */
+    val CONTRIB: Map<String, Pair<String, BuiltinDef>> = listOf(
+        "filter" to BuiltinDef("b64_encode", "base64-encode", listOf(
+            opt("url_safe", "false", "use the URL-safe alphabet"), opt("padded", "true", "add `=` padding"))),
+        "filter" to BuiltinDef("b64_decode", "base64-decode", listOf(opt("url_safe", "false", "use the URL-safe alphabet"))),
+        "function" to BuiltinDef("now", "current datetime", listOf(opt("timezone", "\"UTC\"", "IANA time zone name"))),
+        "filter" to BuiltinDef("date", "format a date or timestamp", listOf(
+            opt("format", null, "strftime format string"), opt("locale", null, "locale for month and day names"),
+            opt("timezone", null, "IANA time zone name"))),
+        "test" to BuiltinDef("is_before", "is before another date", listOf(
+            req("other", "date to compare with"), opt("inclusive", "false", "equal dates count as before"))),
+        "test" to BuiltinDef("is_after", "is after another date", listOf(
+            req("other", "date to compare with"), opt("inclusive", "false", "equal dates count as after"))),
+        "filter" to BuiltinDef("filesize_format", "human readable size", listOf(opt("binary", "true", "use 1024-based units"))),
+        "filter" to BuiltinDef("format", "format with a Rust-style spec", listOf(req("spec", "format specifier such as .2 or 05"))),
+        "filter" to BuiltinDef("json_encode", "serialize as JSON", listOf(opt("pretty", "false", "indent the output"))),
+        "function" to BuiltinDef("get_random", "random number in a range", listOf(
+            req("start", "smallest number"), req("end", "first number that cannot be returned"),
+            opt("seed", null, "seed for reproducible numbers"))),
+        "filter" to BuiltinDef("shuffle", "shuffle an array", listOf(opt("seed", null, "seed for reproducible order"))),
+        "filter" to BuiltinDef("striptags", "remove HTML tags"),
+        "filter" to BuiltinDef("spaceless", "remove whitespace between tags"),
+        "test" to BuiltinDef("matching", "matches a regex", listOf(req("pat", "regular expression"))),
+        "filter" to BuiltinDef("regex_replace", "replace regex matches", listOf(
+            req("pattern", "regular expression"), req("rep", "replacement"))),
+        "filter" to BuiltinDef("slug", "URL slug"),
+        "filter" to BuiltinDef("urlencode", "percent-encode"),
+        "filter" to BuiltinDef("urlencode_strict", "strict percent-encode"),
+    ).associate { (kind, def) -> def.name to (kind to def) } + mapOf(
+        "Matching" to ("test" to BuiltinDef("matching", "matches a regex", listOf(req("pat", "regular expression")))),
+        "RegexReplace" to ("filter" to BuiltinDef("regex_replace", "replace regex matches", listOf(
+            req("pattern", "regular expression"), req("rep", "replacement")))),
+    )
+
     val FILTERS: Map<String, String> = FILTER_DEFS.associate { it.name to it.description }
     val TESTS: Map<String, String> = TEST_DEFS.associate { it.name to it.description }
     val FUNCTIONS: Map<String, String> = FUNCTION_DEFS.associate { it.name to it.description }
@@ -205,7 +349,7 @@ object TeraBuiltins {
         "upper", "lower", "capitalize", "title", "trim", "trim_start", "trim_end", "trim_start_matches",
         "trim_end_matches", "replace", "truncate", "slugify", "urlencode", "urlencode_strict", "escape",
         "escape_xml", "safe", "addslashes", "linebreaksbr", "indent", "striptags", "join", "date", "json_encode",
-        "as_str", "filesizeformat", "pluralize", "spaceless",
+        "as_str", "filesizeformat", "pluralize", "spaceless", "str", "newlines_to_br", "escape_html",
     )
     val NUMBER_RESULT = setOf("length", "wordcount", "int", "float", "round", "abs")
 }

@@ -107,6 +107,66 @@ are reported as unknown, and templates registered with `add_raw_template` have n
 Template output that generates arbitrary language syntax may require additional
 context-aware handling; this plugin does not render templates or infer their output.
 
+## Tera versions: 2.x first, 1.x supported
+
+Tera 2 (a rewrite, latest 2.4.0) differs from Tera 1 (last 1.20.1, which Rocket's `rocket_dyn_templates` still uses). The
+plugin knows both and picks one **per template**:
+
+1. **Settings → Languages & Frameworks → Tera → Tera version**, if set to 1.x or 2.x;
+2. otherwise the nearest `Cargo.toml` above the template: a `tera` dependency (also `workspace = true` and `path`
+   dependencies), or `rocket_dyn_templates` (Tera 1.x, also followed through a `path` dependency such as Rocket's own
+   examples), then `Cargo.lock`;
+3. otherwise **2.x**.
+
+The version decides which filters, tests and functions exist, with their exact arguments (checked against the `tera 2.4.0`
+and `tera-contrib` sources by the tests), which tags exist (`component`, `endset` instead of `macro`, `import`), whether
+tests take positional or keyword arguments, `loop.length`, and what is reported.
+
+### Moving from Tera 1 to Tera 2
+
+* **Deprecation markers.** In a 1.x project, whatever Tera 2 removed or renamed is struck through with a weak warning
+  ("Tera 2 removes the filter `as_str`: renamed to `str`"). In a 2.x project the same things are errors. Switch the hints off
+  under Settings → Tera.
+* **Quick fixes** (Alt+Enter) for each finding: rename the filter/test (`as_str` → `str`, `linebreaksbr` →
+  `newlines_to_br`, `trim_start_matches` → `trim_start`, `divisibleby(2)` → `divisible_by(divisor=2)`, `object` → `map`),
+  positional → keyword test arguments, rename or remove changed arguments (`indent(prefix=…)` → `indentation=…`,
+  `int(default=…)`), `macro` → `component`, remove `import`, macro call → component call.
+* **Migrate this template to Tera 2** (Alt+Enter anywhere in a template) rewrites the whole file;
+  **Code → Migrate Tera Templates to 2.x…** does every template of the project as one undoable change and lists what still
+  needs a human (for example `date` and `slugify`, which moved to `tera-contrib`).
+* **Components** get the same help as macros did: completion of component names after `<` and of attribute names, checks
+  for unknown/missing/duplicate attributes, hover documentation (with `{# … @param x … #}` comments) and go to definition.
+  A component cannot read the render context or its caller's variables; what a body needs from there is an *implicit
+  parameter* (`@values`), and the plugin offers to declare it.
+* **Rust side.** `register_test` (keyword arguments, Tera 2) and `register_tester` (positional, Tera 1), `Kwargs` with
+  `get` / `must_get` (required), and items of `tera-contrib` registered with e.g.
+  `tera.register_filter("date", tera_contrib::dates::date)` are recognised, so a registered replacement silences the
+  "removed in Tera 2" error.
+
+Example, Rocket's `examples/forms` (`macros.html.tera`, `index.html.tera`, `success.html.tera`):
+
+```
+{% import "macros" as m %}                          →  (removed, components are global)
+{% macro value_for(name) %} … {{ values | … }}      →  {% component value_for(name, @values) %} … {% endcomponent value_for %}
+{{ m::input(label="Name", name="account.name") }}   →  {{ <input label="Name" name="account.name"/> }}
+{% if f is containing(value) %}                     →  {% if f is containing(pat=value) %}
+```
+
+The migrated files are in `src/test/resources/rocket-tera2` (see its README for every change). They are golden files in the
+tests, and `tools/verify-migration` renders the originals with Tera 1.20.1 and the migrated files with Tera 2.4.0: the
+output is identical, except that Tera 2 prints an array as JSON.
+
+What a migration cannot do for you, because it is the engine's behaviour and not syntax (the first two seen when rendering
+Rocket's forms example with both engines, the rest from Tera 2's sources and migration guide):
+
+* `{{ array }}` prints `["Bob"]` instead of `[Bob]`; use `| join(sep=", ")` for plain text;
+* maps iterate in arbitrary order unless Tera 2 is built with its `preserve_order` feature (Rocket's context is an `IndexMap`);
+* reading an undefined variable is an error, `and`/`or` short-circuit, `first`/`last`/`nth` give none for an empty array,
+  `group_by` fails when an item lacks the attribute;
+* in Rust: `Tera::new(glob)` is `Tera::default()` plus `load_from_glob` (feature `glob_fs`), functions, filters and tests
+  take `Kwargs` and `&State`, everything must be registered before the templates are added, and Rocket's
+  `rocket_dyn_templates` does not use Tera 2 yet.
+
 ## Build and test
 
 Use JDK 21 and the included Gradle wrapper:

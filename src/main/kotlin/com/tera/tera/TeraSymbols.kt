@@ -114,13 +114,13 @@ object TeraSymbolScanner {
 
     // ── parsing helpers ──────────────────────────────────────────────────────
 
-    private class Args(val groups: List<List<TeraTok>>, val closeIndex: Int)
+    internal class Args(val groups: List<List<TeraTok>>, val closeIndex: Int)
 
     private val OPEN = setOf("(", "[", "{")
     private val CLOSE = setOf(")", "]", "}")
 
     /** Splits the tokens after `tokens[openIndex]` (a `(`) into top-level comma separated groups. */
-    private fun splitArgs(tokens: List<TeraTok>, openIndex: Int): Args {
+    internal fun splitArgs(tokens: List<TeraTok>, openIndex: Int): Args {
         val groups = mutableListOf<List<TeraTok>>()
         var current = mutableListOf<TeraTok>()
         var depth = 1

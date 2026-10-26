@@ -30,7 +30,8 @@ class TeraLexer : LexerBase() {
             "macro", "endmacro",
             "raw", "endraw",
             "filter", "endfilter",
-            "set", "set_global",
+            "set", "set_global", "endset",
+            "component", "endcomponent",
             "extends", "include", "import", "from",
             "break", "continue",
             // 布尔/逻辑字面量和运算符关键字

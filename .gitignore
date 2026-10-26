@@ -57,3 +57,6 @@ $RECYCLE.BIN/
 
 ### JVM heap dumps ###
 *.hprof
+
+### Rust verification tool build output ###
+tools/**/target/

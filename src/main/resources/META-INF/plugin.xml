@@ -128,6 +128,18 @@
         <lang.documentationProvider language="Tera"
                                     implementationClass="com.tera.tera.TeraDocumentationProvider"/>
 
+        <!-- Alt+Enter: migrate this template to Tera 2 -->
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraMigrateIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+
+        <!-- Tera version (auto-detected from Cargo, overridable) -->
+        <projectService serviceImplementation="com.tera.tera.TeraSettings"/>
+        <projectConfigurable parentId="language" instance="com.tera.tera.TeraSettingsConfigurable"
+                             id="com.tera.tera.settings" displayName="Tera"/>
+
         <!-- 语法高亮工厂 -->
         <lang.syntaxHighlighterFactory language="Tera"
                                         implementationClass="com.tera.tera.TeraSyntaxHighlighterFactory"/>
@@ -140,4 +152,12 @@
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/TeraDarcula.xml"/>
 
     </extensions>
+
+    <actions>
+        <action id="Tera.MigrateAll" class="com.tera.tera.TeraMigrateAllAction"
+                text="Migrate Tera Templates to 2.x…"
+                description="Rewrite every Tera template in the project for Tera 2">
+            <add-to-group group-id="CodeMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

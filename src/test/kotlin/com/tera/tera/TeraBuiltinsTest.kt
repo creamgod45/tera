@@ -6,6 +6,12 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 /** Signatures, argument completion and hover documentation for Tera's built-in functions, filters and tests. */
 class TeraBuiltinsTest : BasePlatformTestCase() {
 
+    /** These tests describe Tera 1.x behaviour (Rocket's engine); 2.x has its own tests. */
+    override fun setUp() {
+        super.setUp()
+        TeraSettings.getInstance(project).state.version = "1"
+    }
+
     private fun suggest(textWithCaret: String): List<TeraSuggestion> {
         val caret = textWithCaret.indexOf("<caret>")
         return TeraCompletionEngine.suggest(textWithCaret.replace("<caret>", ""), caret, { null }, { emptyList() })

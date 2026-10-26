@@ -12,6 +12,12 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  */
 class TeraContextTest : BasePlatformTestCase() {
 
+    /** These tests describe Tera 1.x behaviour (Rocket's engine); 2.x has its own tests. */
+    override fun setUp() {
+        super.setUp()
+        TeraSettings.getInstance(project).state.version = "1"
+    }
+
     private fun fixture(path: String) = javaClass.getResource("/rocket/examples/$path")!!.readText()
     private fun scalar(n: String) = TeraType.Scalar(n)
 
@@ -116,12 +122,16 @@ class TeraContextTest : BasePlatformTestCase() {
         assertEquals(1, check("{{ ghost | upper }}").size)
     }
 
-    fun testMacrosCannotReadTheRenderContext() {
-        val text = "{% macro m(a) %}{{ a }}{{ tasks }}{% endmacro %}{{ tasks }}"
-        val e = check(text).single()
-        assertEquals("tasks", e.range.substring(text))
-        assertEquals(text.indexOf("tasks"), e.range.startOffset)
-        assertEquals("Macros cannot read the render context; pass 'tasks' as an argument", e.message)
+    /** Verified against tera 1.20.1's call stack: a macro frame falls back to the render context. */
+    fun testMacrosSeeTheRenderContextInTera1() {
+        assertEmpty(check("{% macro m(a) %}{{ a }}{{ tasks }}{% endmacro %}{{ tasks }}"))
+    }
+
+    fun testMacrosDoNotSeeSetOrLoopVariablesAroundThemInTera1() {
+        val text = "{% set x = 1 %}{% for t in tasks %}{% macro m() %}{{ x }}{{ t }}{% endmacro %}{% endfor %}"
+        val e = check(text)
+        assertEquals(listOf("x", "t"), e.map { it.range.substring(text) })
+        assertEquals("Variable 'x' is not defined in this template or in the Rust render context", e[0].message)
     }
 
     fun testSilentWithoutCompleteKnowledge() {

@@ -26,6 +26,8 @@ object TeraNavigation {
         offset: Int,
         context: TeraContextResult? = null,
         custom: List<TeraCustomBuiltin> = emptyList(),
+        version: TeraVersion = TeraVersion.V1,
+        components: List<TeraComponent> = emptyList(),
         templatesOf: (String) -> List<Pair<VirtualFile, List<MacroDef>>>,
     ): List<TeraDefinition> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
@@ -69,14 +71,27 @@ object TeraNavigation {
             }
         }
 
+        // A component call: the component's definition, or the parameter an attribute names.
+        for (call in TeraComponentScanner.calls(blocks)) {
+            val targets = components.filter { it.def.name == call.name }
+            if (call.nameRange.touches()) {
+                targets.forEach { result.add(TeraDefinition(it.file, it.def.nameRange.startOffset)) }
+                continue
+            }
+            val attr = call.attrs.firstOrNull { it.nameRange?.touches() == true && it.name != null } ?: continue
+            targets.forEach { c ->
+                c.def.params.filter { it.name == attr.name }.forEach { result.add(TeraDefinition(c.file, it.range.startOffset)) }
+            }
+        }
+
         // A variable: its Rust declaration, or the `set`/`for`/macro parameter that introduced it.
-        TeraVariables.refAt(text, offset, context)?.let { ref ->
+        TeraVariables.refAt(text, offset, context, version)?.let { ref ->
             ref.result.field?.target?.let { result.add(TeraDefinition(null, -1, it)) }
             ref.result.binding?.nameRange?.let { result.add(TeraDefinition(null, it.startOffset)) }
         }
 
         // A function, filter or test registered from Rust: its definition there.
-        TeraBuiltinRefs.at(text, offset, custom)?.let { ref ->
+        TeraBuiltinRefs.at(text, offset, custom, version)?.let { ref ->
             custom.firstOrNull { it.kind == ref.kind && it.def.name == ref.def.name }?.target
                 ?.let { result.add(TeraDefinition(null, -1, it)) }
         }
@@ -93,7 +108,8 @@ class TeraGotoDeclarationHandler : GotoDeclarationHandler {
         val vFile = file.originalFile.virtualFile
         val here = file.viewProvider.getPsi(TeraLanguage) ?: return null
 
-        val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file), TeraContexts.customBuiltins(file.project)) { path ->
+        val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file), TeraContexts.customBuiltins(file.project),
+            TeraVersions.forFile(project, vFile).version, TeraComponents.visible(project, vFile, here.text)) { path ->
             vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty()
         }
         val manager = PsiManager.getInstance(project)

@@ -69,6 +69,7 @@ intellijPlatform {
         changeNotes = """
             Fix false errors for whitespace-trimming delimiters and named endmacro/endblock tags.
             Check macro calls against definitions (including import "..." as alias) and add macro, argument, namespace, keyword and template-name completion.
+            Tera versions: detect 1.x or 2.x per template (Cargo.toml, Settings), version-specific built-ins, deprecation markers for what Tera 2 removed or renamed, quick fixes, Migrate to Tera 2 for a file or the whole project, and Tera 2 components (completion, checks, hover, navigation).
             Detect functions, filters and tests registered from Rust (register_function/register_filter/register_tester) for completion, hover and navigation; add signatures and argument completion for Tera's built-ins.
             Complete and check template variables from the Rust code that renders them (Template::render): struct fields, context! keys, loop and set variables, filters, tests and functions.
             Add go to definition (with a chooser for multiple sources) and hover documentation for macros, parameters and import aliases, including comment descriptions and @param types.

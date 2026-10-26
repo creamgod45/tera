@@ -200,7 +200,8 @@ class TeraRustCustomBuiltinsTest : BasePlatformTestCase() {
         assertEquals(listOf("x", "y"), RustCustomBuiltins.argNames("""args.get("x"); args["y"]; args.get("x")""", "function"))
         assertEquals(listOf("size"), RustCustomBuiltins.argNames("""fn f(v: &Value, args: &HashMap<String, Value>) { args.get("size"); other.get("nope"); }""", "filter"))
         assertEquals(listOf("p"), RustCustomBuiltins.argNames("""fn f(opts: &HashMap<String, tera::Value>) { opts.get("p"); }""", "function"))
-        assertEmpty(RustCustomBuiltins.argNames("""args.get("x")""", "test"))
+        // Tera 2 tests read keyword arguments too; whether a test is positional (Tera 1) is decided by register_tester vs register_test.
+        assertEquals(listOf("x"), RustCustomBuiltins.argNames("""args.get("x")""", "test"))
         assertEmpty(RustCustomBuiltins.argNames("""try_get_value!("f", "value", String, v)""", "filter"))
     }
 

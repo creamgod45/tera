@@ -11,8 +11,11 @@ data class TeraBinding(
     val detail: String? = null,
 )
 
-/** What can be referenced at one point of a template. Macros do not see the render context. */
-class TeraScopeSnapshot(val bindings: List<TeraBinding>, val inLoop: Boolean, val inMacro: Boolean)
+/**
+ * What can be referenced at one point of a template. Inside a Tera 2 component ([hidesContext]) the render context is
+ * not visible; a Tera 1 macro sees the context but not the `set` and loop variables around it.
+ */
+class TeraScopeSnapshot(val bindings: List<TeraBinding>, val inLoop: Boolean, val hidesContext: Boolean)
 
 data class PathSeg(val name: String, val index: Boolean = false)
 
@@ -38,6 +41,7 @@ object TeraScopes {
     private val CLOSERS = mapOf(
         "endfor" to "for", "endif" to "if", "endblock" to "block",
         "endmacro" to "macro", "endraw" to "raw", "endfilter" to "filter",
+        "endcomponent" to "component", "endset" to "set",
     )
     private val OPENERS = CLOSERS.values.toSet()
 
@@ -48,6 +52,9 @@ object TeraScopes {
         TeraField("last", TeraType.Scalar("bool"), doc = "true on the last iteration"),
     ))
 
+    val LOOP_TYPE_V2 = TeraType.Struct("loop", LOOP_TYPE.fields + TeraField(
+        "length", TeraType.Scalar("number"), doc = "number of items in the loop"))
+
     private fun isOp(t: TeraTok?, s: String) = t != null && t.type == TeraTokenTypes.OPERATOR && t.text == s
 
     /** An identifier, or one of the keywords that also behaves like a variable (`loop`). */
@@ -57,7 +64,12 @@ object TeraScopes {
     // ── scope walk ───────────────────────────────────────────────────────────
 
     /** One snapshot per block, describing what is visible at the start of that block. */
-    fun snapshots(blocks: List<TeraBlock>, context: TeraContextResult?): List<TeraScopeSnapshot> {
+    fun snapshots(
+        blocks: List<TeraBlock>,
+        context: TeraContextResult?,
+        version: TeraVersion = TeraVersion.V1,
+        text: String = "",
+    ): List<TeraScopeSnapshot> {
         val frames = mutableListOf(Frame("root"))
         val result = ArrayList<TeraScopeSnapshot>(blocks.size)
         for (block in blocks) {
@@ -65,14 +77,20 @@ object TeraScopes {
             val t = block.tokens
             if (block.kind != '%' || t.isEmpty() || t[0].type != TeraTokenTypes.KEYWORD) continue
             when (val kw = t[0].text) {
-                "for" -> frames.add(forFrame(t, visible(frames), context))
+                "for" -> frames.add(forFrame(t, visible(frames), context, version))
                 "macro" -> frames.add(macroFrame(t))
+                "component" -> frames.add(componentFrame(text, block))
                 "if", "block", "filter", "raw" -> frames.add(Frame(kw))
                 "set", "set_global" -> {
                     val name = t.getOrNull(1)?.takeIf { it.type == TeraTokenTypes.IDENTIFIER } ?: continue
-                    if (!isOp(t.getOrNull(2), "=")) continue
-                    val type = evalType(t.drop(3), visible(frames), context)
                     val target = if (kw == "set_global") frames[0] else frames.last { it.kind in HOLDS_SET }
+                    if (!isOp(t.getOrNull(2), "=")) {
+                        // Tera 2 block form: `{% set x %}...{% endset %}` captures its body as a string.
+                        target.bindings.add(TeraBinding(name.text, TeraType.Scalar("string"), "set", name.range, "set in template"))
+                        frames.add(Frame("set"))
+                        continue
+                    }
+                    val type = evalType(t.drop(3), visible(frames), context)
                     target.bindings.add(TeraBinding(name.text, type, "set", name.range, "set in template"))
                 }
                 else -> CLOSERS[kw]?.let { opener ->
@@ -84,22 +102,23 @@ object TeraScopes {
         return result
     }
 
-    private val HOLDS_SET = setOf("root", "for", "macro", "block")
+    private val HOLDS_SET = setOf("root", "for", "macro", "component", "block")
 
     private fun visible(frames: List<Frame>): TeraScopeSnapshot {
         val out = mutableListOf<TeraBinding>()
         var inLoop = false
-        var inMacro = false
+        var hidesContext = false
         for (i in frames.indices.reversed()) {
             val f = frames[i]
             out.addAll(f.bindings.asReversed())
             if (f.kind == "for") inLoop = true
-            if (f.kind == "macro") { inMacro = true; break }
+            if (f.kind == "macro") break                                  // sees the context, not the frames around it
+            if (f.kind == "component") { hidesContext = true; break }     // sees neither
         }
-        return TeraScopeSnapshot(out, inLoop, inMacro)
+        return TeraScopeSnapshot(out, inLoop, hidesContext)
     }
 
-    private fun forFrame(t: List<TeraTok>, snap: TeraScopeSnapshot, context: TeraContextResult?): Frame {
+    private fun forFrame(t: List<TeraTok>, snap: TeraScopeSnapshot, context: TeraContextResult?, version: TeraVersion): Frame {
         val frame = Frame("for")
         val inIdx = t.indexOfFirst { it.type == TeraTokenTypes.KEYWORD && it.text == "in" }
         if (inIdx < 0) return frame
@@ -117,7 +136,7 @@ object TeraScopes {
                 frame.bindings.add(TeraBinding(vars[1].text, valueType, "for", vars[1].range, "loop value"))
             }
         }
-        frame.bindings.add(TeraBinding("loop", LOOP_TYPE, "loop", null, "loop state"))
+        frame.bindings.add(TeraBinding("loop", if (version == TeraVersion.V2) LOOP_TYPE_V2 else LOOP_TYPE, "loop", null, "loop state"))
         return frame
     }
 
@@ -134,6 +153,28 @@ object TeraScopes {
             }
             frame.bindings.add(TeraBinding(p.name, type, "param", p.range, "macro parameter"))
         }
+        return frame
+    }
+
+    private fun typeOfAnnotation(annotation: String?, default: String?): TeraType = when {
+        annotation == "string" || default?.startsWith("\"") == true -> TeraType.Scalar("string")
+        annotation in setOf("integer", "float", "number") || default?.matches(Regex("-?\\d+(\\.\\d+)?")) == true -> TeraType.Scalar("number")
+        annotation == "bool" || default == "true" || default == "false" -> TeraType.Scalar("bool")
+        annotation == "array" || default?.startsWith("[") == true -> TeraType.ArrayOf(TeraType.Unknown)
+        annotation == "map" || default?.startsWith("{") == true -> TeraType.MapOf(TeraType.Unknown)
+        else -> TeraType.Unknown
+    }
+
+    /** A Tera 2 component sees its parameters (explicit, implicit `@x`, the `...rest` map) and its `body`. */
+    private fun componentFrame(text: String, block: TeraBlock): Frame {
+        val frame = Frame("component")
+        val def = TeraComponentScanner.definitions(text, listOf(block)).firstOrNull() ?: return frame
+        for (p in def.params) {
+            val type = if (p.rest) TeraType.MapOf(TeraType.Unknown) else typeOfAnnotation(p.type, p.defaultText)
+            frame.bindings.add(TeraBinding(p.name, type, if (p.implicit) "implicit" else "param", p.range,
+                if (p.implicit) "implicit parameter" else if (p.rest) "rest parameter" else "component parameter"))
+        }
+        frame.bindings.add(TeraBinding("body", TeraType.Scalar("string"), "param", null, "component body"))
         return frame
     }
 
@@ -211,7 +252,7 @@ object TeraScopes {
         if (local != null) {
             type = local.type; binding = local
         } else {
-            val ctx = if (snap.inMacro) null else context?.variables?.firstOrNull { it.name == root.name }
+            val ctx = if (snap.hidesContext) null else context?.variables?.firstOrNull { it.name == root.name }
             if (ctx == null) return PathResult(TeraType.Unknown, null, null, 0, null)
             type = ctx.type; field = ctx
         }

@@ -13,6 +13,7 @@ class VarOccurrence(
     val tokens: List<TeraTok>,
     val segs: List<PathSeg>,
     val optional: Boolean,
+    val blockIndex: Int = -1,
 ) {
     fun resolve(upTo: Int, context: TeraContextResult?): PathResult =
         TeraScopes.resolvePath(segs.take(upTo + 1), snapshot, context)
@@ -31,6 +32,8 @@ object TeraVariables {
     /** Every variable path in `{{ }}` blocks and in the expression parts of `if`/`elif`/`for`/`set`. */
     fun collect(blocks: List<TeraBlock>, snapshots: List<TeraScopeSnapshot>): List<VarOccurrence> {
         val result = mutableListOf<VarOccurrence>()
+        // `<name .../>`: the component name is not a variable.
+        val componentNames = TeraComponentScanner.calls(blocks).map { it.nameRange }
         for ((bi, block) in blocks.withIndex()) {
             val t = block.tokens
             val from = when {
@@ -46,7 +49,7 @@ object TeraVariables {
             var i = from
             while (i < t.size) {
                 val tok = t[i]
-                if (!isName(tok) || !startsPath(t, i)) { i++; continue }
+                if (!isName(tok) || !startsPath(t, i) || componentNames.any { tok.range.startOffset >= it.startOffset && tok.range.endOffset <= it.endOffset }) { i++; continue }
                 val segs = mutableListOf(PathSeg(tok.text))
                 val toks = mutableListOf(tok)
                 var j = i + 1
@@ -68,7 +71,7 @@ object TeraVariables {
                 val optional = (next != null && next.type == TeraTokenTypes.KEYWORD && next.text == "is") ||
                     (isOp(next, "|") && after?.text == "default")
                 if (!isOp(next, "(") && !isOp(next, "=") && !isOp(next, ":")) {
-                    result.add(VarOccurrence(snapshots[bi], toks, segs, optional))
+                    result.add(VarOccurrence(snapshots[bi], toks, segs, optional, bi))
                 }
                 i = j
             }
@@ -95,10 +98,10 @@ object TeraVariables {
      * lacks. Only runs when [context] is [TeraContextResult.complete], so partial knowledge never
      * produces noise.
      */
-    fun check(text: String, context: TeraContextResult?): List<TeraError> {
+    fun check(text: String, context: TeraContextResult?, version: TeraVersion = TeraVersion.V1): List<TeraError> {
         if (context == null || !context.complete) return emptyList()
         val blocks = TeraSymbolScanner.scanBlocks(text)
-        val snapshots = TeraScopes.snapshots(blocks, context)
+        val snapshots = TeraScopes.snapshots(blocks, context, version, text)
         val errors = mutableListOf<TeraError>()
         for (occ in collect(blocks, snapshots)) {
             if (occ.optional) continue
@@ -106,8 +109,9 @@ object TeraVariables {
             if (r.failedAt < 0) continue
             val tok = occ.tokens[r.failedAt]
             if (r.failedAt == 0) {
-                val key = if (occ.snapshot.inMacro) "semantic.var.undefined.macro" else "semantic.var.undefined"
-                errors.add(TeraError(TeraBundle.message(key, tok.text), tok.range, HighlightSeverity.WEAK_WARNING))
+                // Undefined names inside a Tera 2 component are reported by the version check, with a fix.
+                if (occ.snapshot.hidesContext) continue
+                errors.add(TeraError(TeraBundle.message("semantic.var.undefined", tok.text), tok.range, HighlightSeverity.WEAK_WARNING))
             } else {
                 errors.add(TeraError(
                     TeraBundle.message("semantic.field.missing", tok.text, r.failedOn.orEmpty()),
@@ -121,9 +125,9 @@ object TeraVariables {
     /** The occurrence segment under [offset], with what it refers to. */
     class Ref(val occurrence: VarOccurrence, val index: Int, val result: PathResult, val range: TextRange)
 
-    fun refAt(text: String, offset: Int, context: TeraContextResult?): Ref? {
+    fun refAt(text: String, offset: Int, context: TeraContextResult?, version: TeraVersion = TeraVersion.V1): Ref? {
         val blocks = TeraSymbolScanner.scanBlocks(text)
-        val snapshots = TeraScopes.snapshots(blocks, context)
+        val snapshots = TeraScopes.snapshots(blocks, context, version, text)
         for (occ in collect(blocks, snapshots)) {
             val idx = occ.segmentAt(offset)
             if (idx < 0) continue

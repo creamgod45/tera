@@ -162,10 +162,11 @@ class TeraVariablesTest : TestCase() {
         assertTrue(names("{% if true %}{% set n = 1 %}{% endif %}{{ <caret> }}").contains("n"))
     }
 
-    fun testMacroSeesOnlyItsParameters() {
-        val n = names("{% macro m(a, b=\"x\", c=1) %}{{ <caret> }}{% endmacro %}")
+    fun testMacroSeesItsParametersAndTheContextButNotSurroundingVariables() {
+        val n = names("{% set outer = 1 %}{% macro m(a, b=\"x\", c=1) %}{{ <caret> }}{% endmacro %}")
         assertTrue(n.containsAll(listOf("a", "b", "c")))
-        assertFalse(n.contains("tasks"))
+        assertTrue("a Tera 1 macro falls back to the render context", n.contains("tasks"))
+        assertFalse("but not to the set variables around it", n.contains("outer"))
         val after = names("{% macro m(a) %}{% endmacro %}{{ <caret> }}")
         assertTrue(after.contains("tasks"))
         assertFalse(after.contains("a"))

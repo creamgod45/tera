@@ -6,6 +6,13 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 /** Macro definition / import / call analysis, using Rocket's forms example as the real-world source. */
 class TeraMacroTest : BasePlatformTestCase() {
 
+    /** These tests describe Tera 1.x behaviour (Rocket's engine); 2.x has its own tests. */
+    override fun setUp() {
+        super.setUp()
+        TeraSettings.getInstance(project).state.version = "1"
+        TeraSettings.getInstance(project).state.migrationHints = false   // these tests are about macro checks
+    }
+
     private fun fixture(path: String): String =
         javaClass.getResource("/rocket/examples/$path")!!.readText()
 

@@ -28,6 +28,11 @@ object TeraCompletionEngine {
         "raw", "endraw", "filter", "endfilter", "set", "set_global", "extends", "include", "import",
         "break", "continue",
     )
+    private val TAG_KEYWORDS_V2 = listOf(
+        "for", "endfor", "if", "elif", "else", "endif", "block", "endblock", "component", "endcomponent",
+        "raw", "endraw", "filter", "endfilter", "set", "set_global", "endset", "extends", "include",
+        "break", "continue",
+    )
     private val PATH_TAGS = setOf("import", "extends", "include")
     private val NO_NAMESPACE_TAGS = setOf("import", "macro", "endmacro", "block", "endblock", "extends", "include")
 
@@ -38,6 +43,8 @@ object TeraCompletionEngine {
         templateNames: () -> List<String>,
         context: TeraContextResult? = null,
         custom: List<TeraCustomBuiltin> = emptyList(),
+        version: TeraVersion = TeraVersion.V1,
+        components: List<TeraComponent> = emptyList(),
     ): List<TeraSuggestion> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
         val block = blocks.firstOrNull { offset >= it.contentStart && offset <= it.contentEnd } ?: return emptyList()
@@ -61,6 +68,11 @@ object TeraCompletionEngine {
         val limit = typed?.range?.startOffset ?: offset
         val prior = tokens.filter { it.range.endOffset <= limit }
         val symbols = TeraSymbolScanner.symbols(blocks)
+
+        // `<` + name: the components to call; inside a call tag: the attributes still to give.
+        if (version == TeraVersion.V2) {
+            componentSuggestions(block, prior, typed != null, components)?.let { return it }
+        }
 
         fun macrosOf(namespace: String): List<MacroDef>? = when (namespace) {
             "self" -> symbols.macros
@@ -90,7 +102,7 @@ object TeraCompletionEngine {
         }
 
         // range(<caret>) / x | truncate(<caret>): the remaining keyword arguments of a built-in.
-        enclosingBuiltinCall(prior, custom)?.let { (def, used) ->
+        enclosingBuiltinCall(prior, custom, version)?.let { (def, used) ->
             if (prior.last().let { isOp(it, "(") || isOp(it, ",") }) {
                 return def.params.filter { !def.positional && it.name !in used }.map {
                     TeraSuggestion(it.name, if (it.required) "required" else "default ${it.default ?: "none"}", "param", "=")
@@ -98,18 +110,18 @@ object TeraCompletionEngine {
             }
         }
 
-        if (block.kind == '%' && prior.isEmpty()) return TAG_KEYWORDS.map { TeraSuggestion(it) }
+        if (block.kind == '%' && prior.isEmpty()) return (if (version == TeraVersion.V2) TAG_KEYWORDS_V2 else TAG_KEYWORDS).map { TeraSuggestion(it) }
 
-        val snapshot = TeraScopes.snapshots(blocks, context)[blocks.indexOf(block)]
+        val snapshot = TeraScopes.snapshots(blocks, context, version, text)[blocks.indexOf(block)]
         val last = prior.lastOrNull()
         if (last != null && isOp(last, ".")) return fieldSuggestions(prior, snapshot, context)
         if (last != null && isOp(last, "|")) {
-            return TeraBuiltins.defs("filter", custom).map { builtinSuggestion(it, "filter", alwaysParens = false) }
+            return TeraBuiltins.defs("filter", custom, version).map { builtinSuggestion(it, "filter", alwaysParens = false) }
         }
         if (last != null && last.type == TeraTokenTypes.KEYWORD && (last.text == "is" ||
                 (last.text == "not" && prior.getOrNull(prior.size - 2)?.text == "is"))
         ) {
-            return TeraBuiltins.defs("test", custom).map { builtinSuggestion(it, "test", alwaysParens = false) }
+            return TeraBuiltins.defs("test", custom, version).map { builtinSuggestion(it, "test", alwaysParens = false) }
         }
         if (last != null && isOp(last, ":")) return emptyList()
         if (block.kind == '%' && first in NO_NAMESPACE_TAGS) return emptyList()
@@ -124,18 +136,78 @@ object TeraCompletionEngine {
         for (b in snapshot.bindings) {
             if (seen.add(b.name)) result.add(TeraSuggestion(b.name, ": ${b.type.display()}", b.detail.orEmpty()))
         }
-        if (!snapshot.inMacro) {
+        if (!snapshot.hidesContext) {
             for (v in context?.variables.orEmpty()) {
                 if (seen.add(v.name)) result.add(TeraSuggestion(v.name, ": ${v.rustType ?: v.type.display()}", "context"))
             }
         }
-        TeraBuiltins.defs("function", custom).forEach { result.add(builtinSuggestion(it, "function", alwaysParens = true)) }
-        val namespaces = buildList {
+        TeraBuiltins.defs("function", custom, version).forEach { result.add(builtinSuggestion(it, "function", alwaysParens = true)) }
+        // Macro namespaces exist only in Tera 1; Tera 2 calls components instead.
+        val namespaces = if (version == TeraVersion.V2) emptyList() else buildList {
             if (symbols.macros.isNotEmpty()) add("self")
             symbols.imports.forEach { add(it.alias) }
         }.distinct()
         namespaces.forEach { result.add(TeraSuggestion(it, "macros", "", "::")) }
         return result
+    }
+
+    private fun startsOperand(prior: List<TeraTok>, index: Int): Boolean {
+        val prev = prior.getOrNull(index - 1) ?: return true
+        return (prev.type == TeraTokenTypes.OPERATOR && prev.text !in setOf(")", "]", "}")) ||
+            (prev.type == TeraTokenTypes.KEYWORD && prev.text in setOf("and", "or", "not", "in", "if", "else"))
+    }
+
+    /** Component names right after `<`, or attribute names inside the open call tag the caret is in; null if neither. */
+    private fun componentSuggestions(
+        block: TeraBlock, prior: List<TeraTok>, hasPrefix: Boolean, components: List<TeraComponent>,
+    ): List<TeraSuggestion>? {
+        val last = prior.lastOrNull() ?: return null
+        // Component name: `<` at the start of an operand (or first in a `{% %}` tag), nothing but the prefix after it.
+        if (isOp(last, "<") && (if (block.kind == '%') prior.size == 1 else startsOperand(prior, prior.size - 1))) {
+            return components.distinctBy { it.def.name }.map {
+                TeraSuggestion(it.def.name, it.def.signature().removePrefix(it.def.name), "component")
+            }
+        }
+        // Attribute name: walk back to the `<name` of a call tag that is still open.
+        var depth = 0
+        var i = prior.size - 1
+        while (i >= 0) {
+            val t = prior[i]
+            if (isOp(t, "}")) depth++
+            else if (isOp(t, "{")) { if (depth == 0) return null; depth-- }       // inside a {value}: an expression
+            else if (depth == 0 && (isOp(t, ">") )) return null                     // the tag is already closed
+            else if (depth == 0 && isOp(t, "<") && prior.getOrNull(i + 1)?.type == TeraTokenTypes.IDENTIFIER &&
+                (if (block.kind == '%') i == 0 else startsOperand(prior, i))) break
+            i--
+        }
+        if (i < 0) return null
+        var j = i + 1
+        val name = StringBuilder(prior[j].text)
+        j++
+        while (isOp(prior.getOrNull(j), ".") && prior.getOrNull(j + 1)?.type == TeraTokenTypes.IDENTIFIER) { name.append('.').append(prior[j + 1].text); j += 2 }
+        // Only where an attribute can start: right after the name, after another attribute, or after a `{value}`.
+        val lastTok = prior.last()
+        val atAttributeStart = prior.size == j ||
+            lastTok.type == TeraTokenTypes.STRING || lastTok.type == TeraTokenTypes.IDENTIFIER || lastTok.type == TeraTokenTypes.KEYWORD ||
+            lastTok.type == TeraTokenTypes.NUMBER || isOp(lastTok, "}")
+        if (!atAttributeStart || (isOp(prior.getOrNull(prior.size - 1), "=") )) return emptyList()
+        // A bare word right before the prefix still counts as the previous attribute; `name=` means a value is being typed.
+        if (prior.size >= 2 && isOp(prior[prior.size - 1], "=")) return emptyList()
+        val def = components.firstOrNull { it.def.name == name.toString() }?.def ?: return emptyList()
+        val given = mutableSetOf<String>()
+        var k = j
+        while (k < prior.size) {
+            val t = prior[k]
+            if ((t.type == TeraTokenTypes.IDENTIFIER || t.type == TeraTokenTypes.KEYWORD) && !isOp(prior.getOrNull(k - 1), ".")) given.add(t.text)
+            if (isOp(t, "{")) { var d = 0; while (k < prior.size) { if (isOp(prior[k], "{")) d++; if (isOp(prior[k], "}")) { d--; if (d == 0) break }; k++ } }
+            k++
+        }
+        return def.params.filter { !it.rest && it.name !in given }.map { p ->
+            val stringy = p.type == null || p.type == "string"
+            TeraSuggestion(p.name,
+                when { p.implicit -> "implicit"; p.required -> "required"; else -> "default ${p.defaultText}" },
+                "attribute", if (stringy) "=\"\"" else "={}", if (stringy) 2 else 2)
+        }
     }
 
     private fun builtinSuggestion(def: BuiltinDef, kind: String, alwaysParens: Boolean): TeraSuggestion {
@@ -147,7 +219,7 @@ object TeraCompletionEngine {
     private val CLOSE = setOf(")", "]", "}")
 
     /** The built-in function or filter whose argument list contains the caret, with the argument names already given. */
-    private fun enclosingBuiltinCall(prior: List<TeraTok>, custom: List<TeraCustomBuiltin>): Pair<BuiltinDef, Set<String>>? {
+    private fun enclosingBuiltinCall(prior: List<TeraTok>, custom: List<TeraCustomBuiltin>, version: TeraVersion): Pair<BuiltinDef, Set<String>>? {
         var depth = 0
         for (i in prior.indices.reversed()) {
             val t = prior[i]
@@ -159,8 +231,13 @@ object TeraCompletionEngine {
             val callee = prior.getOrNull(i - 1)?.takeIf { it.type == TeraTokenTypes.IDENTIFIER } ?: return null
             val before = prior.getOrNull(i - 2)
             if (before != null && isOp(before, ":")) return null        // a macro call, handled elsewhere
-            val def = TeraBuiltins.byName(if (before != null && isOp(before, "|")) "filter" else "function", custom)[callee.text]
-                ?: return null
+            fun kw(t: TeraTok?, text: String) = t != null && t.type == TeraTokenTypes.KEYWORD && t.text == text
+            val kind = when {
+                before != null && isOp(before, "|") -> "filter"
+                kw(before, "is") || (kw(before, "not") && kw(prior.getOrNull(i - 3), "is")) -> "test"
+                else -> "function"
+            }
+            val def = TeraBuiltins.byName(kind, custom, version)[callee.text] ?: return null
             val used = mutableSetOf<String>()
             var d = 0
             for (j in i + 1 until prior.size) {
@@ -225,6 +302,8 @@ class TeraCompletionContributor : CompletionContributor() {
                     templateNames = { vFile?.let(TeraTemplateResolver::templateNames).orEmpty() },
                     context = TeraContexts.forFile(file),
                     custom = TeraContexts.customBuiltins(file.project),
+                    version = TeraVersions.forFile(file.project, vFile).version,
+                    components = TeraComponents.visible(file.project, vFile, file.text),
                 )
                 for (s in suggestions) {
                     var item = LookupElementBuilder.create(s.text)

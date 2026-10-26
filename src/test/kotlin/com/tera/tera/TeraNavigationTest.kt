@@ -7,6 +7,12 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 /** Go to definition for macros, namespaces, arguments and template paths. */
 class TeraNavigationTest : BasePlatformTestCase() {
 
+    /** These tests describe Tera 1.x behaviour (Rocket's engine); 2.x has its own tests. */
+    override fun setUp() {
+        super.setUp()
+        TeraSettings.getInstance(project).state.version = "1"
+    }
+
     private fun fixture(path: String) = javaClass.getResource("/rocket/examples/$path")!!.readText()
     private val macrosText get() = fixture("forms/templates/macros.html.tera")
     private val indexText get() = fixture("forms/templates/index.html.tera")

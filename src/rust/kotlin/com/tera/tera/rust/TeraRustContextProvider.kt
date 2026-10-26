@@ -11,6 +11,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
 import com.tera.tera.BuiltinDef
 import com.tera.tera.BuiltinParam
+import com.tera.tera.TeraBuiltins
 import com.tera.tera.TeraContextProvider
 import com.tera.tera.TeraCustomBuiltin
 import com.tera.tera.TeraContextResult
@@ -487,8 +488,9 @@ internal object RustTypes {
  * value whose type implements `Function`/`Filter`/`Test`; keyword arguments are read from `args.get("x")`.
  */
 internal object RustCustomBuiltins {
-    private val CALL = Regex("""\.\s*register_(function|filter|tester)\s*\(\s*(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*,""")
-    private val KINDS = mapOf("function" to "function", "filter" to "filter", "tester" to "test")
+    // Tera 1 registers tests with `register_tester` (positional arguments), Tera 2 with `register_test` (keyword arguments).
+    private val CALL = Regex("""\.\s*register_(function|filter|tester|test)\s*\(\s*(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*,""")
+    private val KINDS = mapOf("function" to "function", "filter" to "filter", "tester" to "test", "test" to "test")
 
     fun find(project: Project): List<TeraCustomBuiltin> {
         val found = linkedMapOf<Pair<String, String>, TeraCustomBuiltin>()
@@ -508,14 +510,17 @@ internal object RustCustomBuiltins {
                 val call = PsiTreeUtil.getParentOfType(leaf, RsMethodCall::class.java, false) ?: continue
                 val args = call.valueArgumentList.exprList
                 val line = text.substring(0, m.range.first).count { it == '\n' } + 1
-                val callee = calleeOf(args.getOrNull(1), kind, args.getOrNull(0))
+                val keywordTest = m.groupValues[1] == "test"              // Tera 2
+                val positionalTest = kind == "test" && !keywordTest         // Tera 1
+                val callee = calleeOf(args.getOrNull(1), kind, args.getOrNull(0), positionalTest)
                 val source = "${vf.name}:$line"
+                val contrib = if (callee?.target == null) contribOf(args.getOrNull(1), kind, name, text, source) else null
                 val doc = callee?.doc
                 val description = doc?.lineSequence()?.firstOrNull { it.isNotBlank() } ?: "registered in Rust ($source)"
-                val params = if (kind == "test") emptyList() else (callee?.args.orEmpty()).map {
-                    BuiltinParam(it, false, null, "argument read by the Rust code")
+                val params = if (positionalTest) emptyList() else (callee?.args.orEmpty()).map {
+                    BuiltinParam(it.first, it.second, null, if (it.second) "required argument" else "argument read by the Rust code")
                 }
-                val def = BuiltinDef(name, description, params, positional = kind == "test", source = source, details = doc)
+                val def = contrib ?: BuiltinDef(name, description, params, positional = positionalTest, source = source, details = doc)
                 found[kind to name] = TeraCustomBuiltin(kind, def, callee?.target ?: args.getOrNull(0))
             }
         }
@@ -526,9 +531,9 @@ internal object RustCustomBuiltins {
         com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
             ?: String(vf.contentsToByteArray(), vf.charset)
 
-    private class Callee(val doc: String?, val target: PsiElement?, val args: List<String>)
+    private class Callee(val doc: String?, val target: PsiElement?, val args: List<Pair<String, Boolean>>)
 
-    private fun calleeOf(expr0: RsExpr?, kind: String, nameLiteral: PsiElement?): Callee? {
+    private fun calleeOf(expr0: RsExpr?, kind: String, nameLiteral: PsiElement?, positionalTest: Boolean): Callee? {
         var expr: PsiElement = expr0 ?: return null
         // Box::new(f)
         if (expr is RsCallExpr && (expr.expr as? RsPathExpr)?.path?.text?.endsWith("Box::new") == true) {
@@ -536,28 +541,28 @@ internal object RustCustomBuiltins {
         }
         return try {
             when (expr) {
-                is RsLambdaExpr -> Callee(null, nameLiteral, argNames(expr.text, kind))
+                is RsLambdaExpr -> Callee(null, nameLiteral, if (positionalTest) emptyList() else argSpecs(expr.text, kind))
                 is RsPathExpr -> {
                     val target = (expr.path.reference?.resolve() as? RsFunction)
                         ?: expr.path.referenceName?.let { functionByName(expr, it) }
-                    if (target != null) fromFunction(target, kind) else implOf(expr, expr.path.referenceName, kind)
+                    if (target != null) fromFunction(target, kind, positionalTest) else implOf(expr, expr.path.referenceName, kind, positionalTest)
                 }
                 is RsCallExpr -> {
                     val path = (expr.expr as? RsPathExpr)?.path
                     val target = (path?.reference?.resolve() as? RsFunction)
                         ?: path?.referenceName?.let { functionByName(expr, it) }
-                    if (target != null && path?.path == null) fromFunction(target, kind)
-                    else implOf(expr, path?.path?.referenceName ?: path?.referenceName, kind)
-                        ?: target?.let { fromFunction(it, kind) }
+                    if (target != null && path?.path == null) fromFunction(target, kind, positionalTest)
+                    else implOf(expr, path?.path?.referenceName ?: path?.referenceName, kind, positionalTest)
+                        ?: target?.let { fromFunction(it, kind, positionalTest) }
                 }
-                is RsStructLiteral -> implOf(expr, expr.path.referenceName, kind)
+                is RsStructLiteral -> implOf(expr, expr.path.referenceName, kind, positionalTest)
                 else -> null
             }
         } catch (e: ProcessCanceledException) { throw e } catch (e: Exception) { null }
     }
 
-    private fun fromFunction(fn: RsFunction, kind: String) =
-        Callee(RustTypes.docOf(fn.text), fn.identifier, argNames(fn.text, kind))
+    private fun fromFunction(fn: RsFunction, kind: String, positionalTest: Boolean) =
+        Callee(RustTypes.docOf(fn.text), fn.identifier, if (positionalTest) emptyList() else argSpecs(fn.text, kind))
 
     private fun functionByName(context: PsiElement, name: String): RsFunction? {
         val project = context.project
@@ -572,7 +577,7 @@ internal object RustCustomBuiltins {
     }
 
     /** `impl Function for Type { fn call(&self, args: ..) }` (or Filter/Test) for the type used as the second argument. */
-    private fun implOf(context: PsiElement, typeName: String?, kind: String): Callee? {
+    private fun implOf(context: PsiElement, typeName: String?, kind: String, positionalTest: Boolean): Callee? {
         typeName ?: return null
         val trait = when (kind) { "function" -> "Function"; "filter" -> "Filter"; else -> "Test" }
         val pattern = Regex("""\bimpl\s+(?:[A-Za-z_:]*::)?$trait\s+for\s+${Regex.escape(typeName)}\b""")
@@ -582,27 +587,62 @@ internal object RustCustomBuiltins {
             val m = pattern.find(textOf(vf)) ?: continue
             val leaf = PsiManager.getInstance(project).findFile(vf)?.findElementAt(m.range.first) ?: continue
             val impl = PsiTreeUtil.getParentOfType(leaf, RsImplItem::class.java, false) ?: continue
-            return Callee(RustTypes.docOf(impl.text), impl, argNames(impl.text, kind))
+            return Callee(RustTypes.docOf(impl.text), impl, if (positionalTest) emptyList() else argSpecs(impl.text, kind))
         }
         return null
     }
 
-    /** Keyword names the code reads from its argument map: `args.get("x")`, `args["x"]`, `try_get_value!("f", "x", ..)`. */
-    fun argNames(code: String, kind: String): List<String> {
-        if (kind == "test") return emptyList()
+    /**
+     * Keyword arguments the code reads, in order of appearance, and whether it insists on them:
+     * Tera 1 `args.get("x")`, `args["x"]`, `try_get_value!("f", "x", ..)`; Tera 2 `kwargs.get::<T>("x")` (optional) and
+     * `kwargs.must_get::<T>("x")` (required).
+     */
+    fun argSpecs(code: String, kind: String): List<Pair<String, Boolean>> {
+        if (kind == "test") return argSpecsOfTest(code)
+        return collect(code, kind)
+    }
+
+    /** Tera 2 tests read keyword arguments like everything else; Tera 1 tests have none (see the caller). */
+    private fun argSpecsOfTest(code: String) = collect(code, "test")
+
+    private fun collect(code: String, kind: String): List<Pair<String, Boolean>> {
         val typed = Regex("""(\w+)\s*:\s*&\s*(?:std::collections::)?HashMap\s*<\s*String\s*,\s*(?:[\w:]*::)?Value\s*>""")
             .findAll(code).map { it.groupValues[1] }.toList()
-        val receivers = (typed + listOf("args", "kwargs")).distinct()
-        val found = mutableListOf<Pair<Int, String>>()      // position, name: keep the order of appearance
+        val tera2 = Regex("""(\w+)\s*:\s*(?:[\w:]*::)?Kwargs\b""").findAll(code).map { it.groupValues[1] }.toList()
+        val receivers = (typed + tera2 + listOf("args", "kwargs")).distinct()
+        val found = mutableListOf<Triple<Int, String, Boolean>>()      // position, name, required
         for (r in receivers) {
             val q = Regex.escape(r)
-            Regex("""\b$q\s*\.\s*(?:get|get_mut|remove|contains_key)\s*\(\s*"(\w+)"""").findAll(code)
-                .forEach { found.add(it.range.first to it.groupValues[1]) }
-            Regex("""\b$q\s*\[\s*"(\w+)"\s*\]""").findAll(code).forEach { found.add(it.range.first to it.groupValues[1]) }
+            Regex("""\b$q\s*\.\s*(get|get_mut|remove|contains_key|must_get)\s*(?:::\s*<[^>]*>)?\s*\(\s*"(\w+)"""").findAll(code)
+                .forEach { found.add(Triple(it.range.first, it.groupValues[2], it.groupValues[1] == "must_get")) }
+            Regex("""\b$q\s*\[\s*"(\w+)"\s*\]""").findAll(code).forEach { found.add(Triple(it.range.first, it.groupValues[1], false)) }
         }
-        Regex("""try_get_value!\s*\(\s*"[^"]*"\s*,\s*"(\w+)"""").findAll(code).forEach { found.add(it.range.first to it.groupValues[1]) }
-        val names = linkedSetOf<String>().apply { found.sortedBy { it.first }.forEach { add(it.second) } }
-        if (kind == "filter") names.remove("value")
-        return names.toList()
+        Regex("""try_get_value!\s*\(\s*"[^"]*"\s*,\s*"(\w+)"""").findAll(code).forEach { found.add(Triple(it.range.first, it.groupValues[1], false)) }
+        val result = linkedMapOf<String, Boolean>()
+        for ((_, name, required) in found.sortedBy { it.first }) result[name] = (result[name] ?: false) || required
+        if (kind == "filter") result.remove("value")
+        return result.map { it.key to it.value }
+    }
+
+    /** Names only, for callers that do not care whether an argument is required. */
+    fun argNames(code: String, kind: String): List<String> = argSpecs(code, kind).map { it.first }
+
+    // ── tera-contrib ─────────────────────────────────────────────────────────
+
+    /**
+     * `tera.register_filter("date", tera_contrib::dates::date)`: the callable is in the `tera-contrib` crate, whose
+     * items and arguments are known, so they are described exactly. The registered name is the one the template uses.
+     */
+    private fun contribOf(callee: RsExpr?, kind: String, name: String, fileText: String, source: String): BuiltinDef? {
+        callee ?: return null
+        if (!fileText.contains("tera_contrib")) return null
+        val segments = Regex("""[A-Za-z_][A-Za-z0-9_]*""").findAll(
+            callee.text.substringBefore('(').takeIf { callee.text.contains("::") } ?: callee.text,
+        ).map { it.value }.toList().reversed()
+        // `tera_contrib::dates::date`, or `Matching::default()` whose last segment is a constructor.
+        val entry = segments.firstNotNullOfOrNull { seg -> TeraBuiltins.CONTRIB[seg]?.takeIf { it.first == kind } } ?: return null
+        val d = entry.second
+        return BuiltinDef(name, d.description, d.params, d.example, d.positional, source,
+            "From tera-contrib (${d.name}). Registered in Rust ($source).")
     }
 }

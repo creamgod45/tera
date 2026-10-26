@@ -1,0 +1,2 @@
+{% component badge(label) %}{{ label | str }}{% endcomponent %}
+{{ <badge label="x"/> }}

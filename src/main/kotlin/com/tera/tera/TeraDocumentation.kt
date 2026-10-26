@@ -22,7 +22,7 @@ object TeraBuiltinRefs {
     private val SKIPPED_TAGS = setOf("macro", "endmacro", "import", "extends", "include", "block", "endblock")
 
     /** The built-in named by the token under [offset], decided by how it is written (`|`, `is`, `name(`). */
-    fun at(text: String, offset: Int, custom: List<TeraCustomBuiltin> = emptyList()): BuiltinRef? {
+    fun at(text: String, offset: Int, custom: List<TeraCustomBuiltin> = emptyList(), version: TeraVersion = TeraVersion.V1): BuiltinRef? {
         for (block in TeraSymbolScanner.scanBlocks(text)) {
             if (offset < block.contentStart || offset > block.contentEnd) continue
             val t = block.tokens
@@ -37,11 +37,11 @@ object TeraBuiltinRefs {
             fun kw(x: TeraTok?, s: String) = x != null && x.type == TeraTokenTypes.KEYWORD && x.text == s
             return when {
                 op(prev, "|") || (block.kind == '%' && first == "filter" && i == 1) ->
-                    TeraBuiltins.byName("filter", custom)[name]?.let { BuiltinRef(it, "filter", t[i]) }
+                    TeraBuiltins.byName("filter", custom, version)[name]?.let { BuiltinRef(it, "filter", t[i]) }
                 kw(prev, "is") || (kw(prev, "not") && kw(t.getOrNull(i - 2), "is")) ->
-                    TeraBuiltins.byName("test", custom)[name]?.let { BuiltinRef(it, "test", t[i]) }
+                    TeraBuiltins.byName("test", custom, version)[name]?.let { BuiltinRef(it, "test", t[i]) }
                 op(next, "(") && !op(prev, ".") && !op(prev, ":") ->
-                    TeraBuiltins.byName("function", custom)[name]?.let { BuiltinRef(it, "function", t[i]) }
+                    TeraBuiltins.byName("function", custom, version)[name]?.let { BuiltinRef(it, "function", t[i]) }
                 else -> null
             }
         }
@@ -80,8 +80,11 @@ object TeraDocumentation {
         }
 
     /** The `{# ... #}` comment placed directly before the macro's opening tag, if any. */
-    fun docComment(text: String, macro: MacroDef): DocComment? {
-        val tagStart = text.lastIndexOf("{%", macro.nameRange.startOffset)
+    fun docComment(text: String, macro: MacroDef): DocComment? = docCommentAt(text, macro.nameRange.startOffset)
+
+    /** The comment directly before the `{% macro %}` / `{% component %}` tag that contains [nameStart]. */
+    fun docCommentAt(text: String, nameStart: Int): DocComment? {
+        val tagStart = text.lastIndexOf("{%", nameStart)
         if (tagStart < 0) return null
         val before = text.substring(0, tagStart).trimEnd()
         if (!before.endsWith("#}")) return null
@@ -203,6 +206,57 @@ object TeraDocumentation {
         return sb.toString()
     }
 
+    fun componentHtml(text: String, def: ComponentDef, fileName: String): String {
+        val doc = docCommentAt(text, def.nameRange.startOffset)
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>component ").append(esc(def.signature())).append("</pre>")
+            .append(DocumentationMarkup.DEFINITION_END)
+        doc?.description?.takeIf { it.isNotEmpty() }?.let {
+            sb.append(DocumentationMarkup.CONTENT_START).append(para(it)).append(DocumentationMarkup.CONTENT_END)
+        }
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        if (def.params.isEmpty()) section(sb, "Attributes:", "none") else {
+            val body = StringBuilder()
+            for (p in def.params) {
+                body.append("<p><code>").append(esc(if (p.rest) "...${p.name}" else if (p.implicit) "@${p.name}" else p.name)).append("</code>")
+                p.type?.let { body.append(": <i>").append(esc(it)).append("</i>") }
+                body.append(" – ").append(componentParamKind(p))
+                doc?.params?.get(p.name)?.text?.takeIf { it.isNotEmpty() }?.let { body.append(" – ").append(esc(it)) }
+                body.append("</p>")
+            }
+            section(sb, "Attributes:", body.toString())
+        }
+        section(sb, "Called as:", "<code>${esc("<" + def.name + def.requiredParams.joinToString("") { " ${it.name}=…" } + "/>")}</code>")
+        section(sb, "Defined in:", "<code>${esc(fileName)}</code>")
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
+    private fun componentParamKind(p: ComponentParam): String = when {
+        p.rest -> "collects every other attribute into a map"
+        p.implicit -> "implicit, read from the caller's scope" + (p.defaultText?.let { ", default <code>${esc(it)}</code>" } ?: "")
+        p.hasDefault -> "optional, default <code>${esc(p.defaultText.orEmpty())}</code>"
+        else -> "required"
+    }
+
+    fun componentAttributeHtml(text: String, def: ComponentDef, param: ComponentParam, fileName: String): String {
+        val doc = docCommentAt(text, def.nameRange.startOffset)
+        val sb = StringBuilder()
+        sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>(attribute) ").append(esc(param.name))
+            .append(": ").append(esc(param.type ?: "any"))
+            .append(param.defaultText?.let { " = " + esc(it) }.orEmpty()).append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+        doc?.params?.get(param.name)?.text?.takeIf { it.isNotEmpty() }?.let {
+            sb.append(DocumentationMarkup.CONTENT_START).append(para(it)).append(DocumentationMarkup.CONTENT_END)
+        }
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        section(sb, "Kind:", componentParamKind(param))
+        section(sb, "Component:", "<code>${esc(def.signature())}</code>")
+        doc?.description?.takeIf { it.isNotEmpty() }?.let { section(sb, "About component:", para(it)) }
+        section(sb, "Defined in:", "<code>${esc(fileName)}</code>")
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
     fun variableHtml(ref: TeraVariables.Ref, context: TeraContextResult?): String {
         val r = ref.result
         val name = ref.occurrence.segs[ref.index].name
@@ -265,7 +319,12 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         class Import(val imp: ImportDecl) : Described
         class Variable(val ref: TeraVariables.Ref, val context: TeraContextResult?) : Described
         class Builtin(val ref: BuiltinRef) : Described
+        class Component(val def: ComponentDef) : Described
+        class ComponentAttribute(val def: ComponentDef, val param: ComponentParam) : Described
     }
+
+    private fun versionOf(file: PsiFile): TeraVersion =
+        TeraVersions.forFile(file.project, file.originalFile.virtualFile).version
 
     private fun describe(file: PsiFile, offset: Int): Described? {
         val symbols = TeraSymbolScanner.scan(file.text)
@@ -274,10 +333,14 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             m.params.firstOrNull { it.range.startOffset == offset }?.let { return Described.Param(m, it) }
         }
         symbols.imports.firstOrNull { it.aliasRange.startOffset == offset }?.let { return Described.Import(it) }
-        TeraBuiltinRefs.at(file.text, offset, TeraContexts.customBuiltins(file.project))?.takeIf { it.token.range.startOffset == offset }
+        for (c in TeraComponentScanner.definitions(file.text)) {
+            if (c.nameRange.startOffset == offset) return Described.Component(c)
+            c.params.firstOrNull { it.range.startOffset == offset }?.let { return Described.ComponentAttribute(c, it) }
+        }
+        TeraBuiltinRefs.at(file.text, offset, TeraContexts.customBuiltins(file.project), versionOf(file))?.takeIf { it.token.range.startOffset == offset }
             ?.let { return Described.Builtin(it) }
         val context = TeraContexts.forFile(file)
-        TeraVariables.refAt(file.text, offset, context)?.takeIf { it.range.startOffset == offset }
+        TeraVariables.refAt(file.text, offset, context, versionOf(file))?.takeIf { it.range.startOffset == offset }
             ?.let { return Described.Variable(it, context) }
         return null
     }
@@ -303,18 +366,24 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         }
         symbols.imports.firstOrNull { targetOffset in it.aliasRange.startOffset..it.aliasRange.endOffset }
             ?.let { return here.findElementAt(it.aliasRange.startOffset) }
+        for (c in TeraComponentScanner.definitions(here.text)) {
+            if (targetOffset in c.nameRange.startOffset..c.nameRange.endOffset) return here.findElementAt(c.nameRange.startOffset)
+            c.params.firstOrNull { targetOffset in it.range.startOffset..it.range.endOffset }
+                ?.let { return here.findElementAt(it.range.startOffset) }
+        }
 
         // Hovering a built-in function, filter or test.
-        TeraBuiltinRefs.at(here.text, targetOffset, TeraContexts.customBuiltins(file.project))?.let { return here.findElementAt(it.token.range.startOffset) }
+        TeraBuiltinRefs.at(here.text, targetOffset, TeraContexts.customBuiltins(file.project), versionOf(file))?.let { return here.findElementAt(it.token.range.startOffset) }
 
         // Hovering a variable use.
-        TeraVariables.refAt(here.text, targetOffset, TeraContexts.forFile(file))
+        TeraVariables.refAt(here.text, targetOffset, TeraContexts.forFile(file), versionOf(file))
             ?.let { return here.findElementAt(it.range.startOffset) }
 
         // Hovering a use: take the first declaration navigation would offer.
         val templatesOf = { path: String -> vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty() }
         val manager = PsiManager.getInstance(file.project)
-        for (def in TeraNavigation.definitions(here.text, targetOffset, null, emptyList(), templatesOf)) {
+        for (def in TeraNavigation.definitions(here.text, targetOffset, null, emptyList(), versionOf(file),
+            TeraComponents.visible(file.project, vFile, here.text), templatesOf)) {
             if (def.offset < 0) continue
             val psi = if (def.file == null) here
             else manager.findFile(def.file)?.viewProvider?.getPsi(TeraLanguage) ?: continue
@@ -341,6 +410,8 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             }
             is Described.Variable -> TeraDocumentation.variableHtml(d.ref, d.context)
             is Described.Builtin -> TeraDocumentation.builtinHtml(d.ref)
+            is Described.Component -> TeraDocumentation.componentHtml(text, d.def, file.name)
+            is Described.ComponentAttribute -> TeraDocumentation.componentAttributeHtml(text, d.def, d.param, file.name)
             null -> null
         }
     }
@@ -356,6 +427,8 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             }
             is Described.Import -> "import \"${d.imp.path}\" as ${d.imp.alias}"
             is Described.Builtin -> "(${d.ref.kind}) ${d.ref.def.signature()}"
+            is Described.Component -> "${file.name}: component ${d.def.signature()}"
+            is Described.ComponentAttribute -> "${file.name}: ${d.def.name}(${d.param.name}${d.param.type?.let { ": $it" }.orEmpty()})"
             is Described.Variable -> "(variable) ${d.ref.occurrence.segs[d.ref.index].name}: " +
                 (d.ref.result.field?.rustType ?: d.ref.result.type.display())
             null -> null

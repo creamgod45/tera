@@ -8,6 +8,12 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 /** Functions, filters and tests registered by project code, as a provider reports them. */
 class TeraCustomBuiltinsTest : BasePlatformTestCase() {
 
+    /** These tests describe Tera 1.x behaviour (Rocket's engine); 2.x has its own tests. */
+    override fun setUp() {
+        super.setUp()
+        TeraSettings.getInstance(project).state.version = "1"
+    }
+
     private fun custom(kind: String, name: String, description: String, args: List<String> = emptyList(),
                        doc: String? = null, source: String = "main.rs:7", target: PsiElement? = null) =
         TeraCustomBuiltin(kind, BuiltinDef(name, description,
