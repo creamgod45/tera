@@ -24,6 +24,8 @@ import org.rust.lang.core.psi.RsExpr
 import org.rust.lang.core.psi.RsFunction
 import org.rust.lang.core.psi.RsImplItem
 import org.rust.lang.core.psi.RsLambdaExpr
+import org.rust.lang.core.psi.RsLitExpr
+import org.rust.lang.core.psi.RsValueArgumentList
 import org.rust.lang.core.psi.RsMethodCall
 import org.rust.lang.core.psi.RsLetDecl
 import org.rust.lang.core.psi.RsMacroCall
@@ -109,32 +111,61 @@ class TeraRustContextProvider : TeraContextProvider {
         return linkedSetOf(bare, rel)
     }
 
+    /**
+     * Render sites found by meaning, not by the name of the function: a string literal that is the path of this
+     * template and is passed to a call, whose context argument is the one the callee declares as serializable
+     * (`impl Serialize`, `T: Serialize`, `tera::Context`, `serde_json::Value`) or, when the callee is not known, the
+     * `&value` / `context! {..}` that follows the name.
+     */
     private fun renderSites(project: Project, names: Set<String>): List<Site> {
-        val any = names.joinToString("|") { Regex.escape(it) }
-        // `Template::render("x", ctx)` (Rocket), and a `render("x", ctx)` method of the app's own engine wrapper.
-        val pattern = Regex("""(?:\bTemplate\s*::\s*render|\.\s*render)\s*\(\s*"(?:$any)"\s*,""")
+        val pattern = Regex("\"(?:" + names.joinToString("|") { Regex.escape(it) } + ")\"")
         val result = mutableListOf<Site>()
-        val files = TeraFiles.projectFiles(project, "rs")
-        for (vf in files) {
+        for (vf in TeraFiles.projectFiles(project, "rs")) {
             if ("/target/" in vf.path) continue
             val text = TeraFiles.textOf(vf)
             val matches = pattern.findAll(text).toList()
             if (matches.isEmpty()) continue
             val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
             for (m in matches) {
-                val leaf = psi.findElementAt(m.range.first + m.value.indexOf("render")) ?: continue
-                val line = text.substring(0, m.range.first).count { it == '\n' } + 1
-                val method = PsiTreeUtil.getParentOfType(leaf, RsMethodCall::class.java, false)
-                val call = PsiTreeUtil.getParentOfType(leaf, RsCallExpr::class.java, false)
-                val args = when {
-                    method != null && (call == null || PsiTreeUtil.isAncestor(call, method, true)) -> method.valueArgumentList.exprList
-                    call != null -> call.valueArgumentList.exprList
-                    else -> continue
-                }
-                result.add(Site(vf, args.getOrNull(1), line))
+                val literal = PsiTreeUtil.getParentOfType(psi.findElementAt(m.range.first + 1), RsLitExpr::class.java, false) ?: continue
+                val list = literal.parent as? RsValueArgumentList ?: continue
+                val args = list.exprList
+                val callee = RustCallees.resolve(list.parent)
+                val arg = RustCallees.contextArgument(list.parent, callee, args, args.indexOf(literal)) ?: continue
+                result.add(Site(vf, arg, text.substring(0, m.range.first).count { it == '\n' } + 1))
             }
         }
         return result
+    }
+}
+
+/** Reading a call: which function it reaches and which of its arguments carries the template data. */
+internal object RustCallees {
+    fun resolve(call: PsiElement?): RsFunction? = try {
+        when (call) {
+            is RsMethodCall -> call.reference?.resolve() as? RsFunction
+            is RsCallExpr -> ((call.expr as? RsPathExpr)?.path?.reference?.resolve()) as? RsFunction
+            else -> null
+        }
+    } catch (e: ProcessCanceledException) { throw e } catch (e: Exception) { null }
+
+    fun contextArgument(call: PsiElement?, callee: RsFunction?, args: List<RsExpr>, nameIndex: Int): RsExpr? {
+        if (nameIndex < 0) return null
+        if (callee != null) {
+            // `Type::render(&self, name, ctx)` called by path passes `self` as the first argument.
+            val shift = if (call is RsCallExpr && callee.valueParameterList?.selfParameter != null) 1 else 0
+            val params = callee.valueParameterList?.valueParameterList.orEmpty()
+            val bounds = (callee.typeParameterList?.typeParameterList.orEmpty().filter { "Serialize" in it.text }.mapNotNull { it.name } +
+                Regex("""\b(\w+)\s*:[^,{]*\bSerialize\b""").findAll(callee.whereClause?.text.orEmpty()).map { it.groupValues[1] }).toSet()
+            val index = params.indexOfFirst { p ->
+                val t = p.typeReference?.text.orEmpty()
+                "Serialize" in t || Regex("""\b(Context|Value)\b""").containsMatchIn(t) || bounds.any { Regex("""\b$it\b""").containsMatchIn(t) }
+            }
+            if (index >= 0) return args.getOrNull(index + shift)
+        }
+        val next = args.drop(nameIndex + 1).firstOrNull() ?: return null
+        // A callee the Rust plugin cannot see (an unresolved library): the value after the name, unless it is a plain literal.
+        return next.takeIf { it !is RsLitExpr }
     }
 }
 
