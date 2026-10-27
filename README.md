@@ -143,6 +143,28 @@ tests take positional or keyword arguments, `loop.length`, and what is reported.
   `tera.register_filter("date", tera_contrib::dates::date)` are recognised, so a registered replacement silences the
   "removed in Tera 2" error.
 
+### Types
+
+Tera 2 has types, and enforces them *while rendering*: a component parameter can be typed (`string`, `bool`, `integer`,
+`float`, `number`, `array`, `map`, `bytes`; any case), a parameter without an annotation takes the type of its default value
+(`priority = 1` is an integer parameter), and filters and tests reject input of another kind (`{{ [1] | upper }}` fails with
+"expected `string` but got `array`"). Tera 1 had none of this. The plugin reports the same problems while you edit a Tera 2
+template, using the types it knows: literals, `set`/`for` variables and, with the Rust plugin, the types of the render context.
+
+| | |
+|---|---|
+| `{% component c(a: strng) %}` | error: unknown type, only string, bool, integer, float, number, array, map and bytes |
+| `{% component c(a: string = 1) %}` | error: default value has type `integer` but the argument has type `string` (also `float = 1`, `integer = 1.5`) |
+| `<card age="x"/>` for `age: integer` | error: argument `age` (type `string`) does not match expected type `integer`; for a variable of a known type a warning |
+| `{{ [1] \| upper }}`, `{% if "a" is odd %}` | error: filter/test expects `string` / `number` but the value is `array` / `string` |
+| `{{ tasks \| upper }}` with `tasks: Vec<Task>` | warning: expects `string`, but the value is `array<Task>` |
+| `{{ count \| upper }}` | warning, with the quick fix **Convert with `\| str` first** (`\| float` / `\| int` for a string given to `round`, `abs`, `pluralize`) |
+
+Completion after `|` and `is` puts the filters and tests that fit the value before the caret first, the others last, and the
+hover shows what a filter accepts (`Input: string`). The input kinds come from the parameter types in the `tera 2.4.0`
+sources and are cross-checked by the tests. Filters registered from Rust are never type-checked, and a value whose type is not
+known is never reported.
+
 Example, Rocket's `examples/forms` (`macros.html.tera`, `index.html.tera`, `success.html.tera`):
 
 ```

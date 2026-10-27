@@ -50,7 +50,8 @@ class TeraExternalAnnotator : ExternalAnnotator<TeraAnnotatorInput, List<TeraErr
         analyze(input.text) + TeraSemanticChecker.check(input.text) { input.importedMacros[it] } +
             TeraVariables.check(input.text, input.context, input.version) +
             TeraMigration.check(input.text, input.version, input.custom, input.migrationHints) +
-            (if (input.version == TeraVersion.V2) TeraComponentChecker.check(input.text, input.components) else emptyList())
+            (if (input.version == TeraVersion.V2) TeraComponentChecker.check(input.text, input.components) +
+                TeraTypeChecker.check(input.text, input.context, input.components, input.custom) else emptyList())
 
     /** Syntax checks only (block structure, tag shapes); no cross-template analysis. */
     fun doAnnotate(fileText: String): List<TeraError> = analyze(fileText)

@@ -156,7 +156,10 @@ object TeraScopes {
         return frame
     }
 
-    private fun typeOfAnnotation(annotation: String?, default: String?): TeraType = when {
+    private fun typeOfAnnotation(annotation0: String?, default: String?): TeraType = typeOfAnnotationLower(annotation0?.lowercase(), default)
+
+    private fun typeOfAnnotationLower(annotation: String?, default: String?): TeraType = when {
+        annotation == "bytes" -> TeraType.ArrayOf(TeraType.Scalar("number"))
         annotation == "string" || default?.startsWith("\"") == true -> TeraType.Scalar("string")
         annotation in setOf("integer", "float", "number") || default?.matches(Regex("-?\\d+(\\.\\d+)?")) == true -> TeraType.Scalar("number")
         annotation == "bool" || default == "true" || default == "false" -> TeraType.Scalar("bool")

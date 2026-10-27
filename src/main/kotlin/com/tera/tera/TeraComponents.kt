@@ -21,6 +21,9 @@ data class ComponentParam(
     val implicit: Boolean,
     val rest: Boolean,
     val range: TextRange,
+    /** Where the written type annotation and the default value are, for diagnostics. */
+    val typeRange: TextRange? = null,
+    val defaultRange: TextRange? = null,
 ) {
     val hasDefault get() = defaultText != null
     /** Must be given as an attribute: no default, not implicit, not the rest parameter. */
@@ -49,7 +52,14 @@ data class ComponentDef(
 }
 
 /** One attribute written in a component call: `name`, `name="x"`, `name={expr}` or `{...spread}`. */
-data class ComponentAttr(val name: String?, val spread: Boolean, val range: TextRange, val nameRange: TextRange?)
+data class ComponentAttr(
+    val name: String?,
+    val spread: Boolean,
+    val range: TextRange,
+    val nameRange: TextRange?,
+    /** The `"x"` or `{expr}` after the `=`; null for a shorthand attribute (`<c name/>`) or a spread. */
+    val valueRange: TextRange? = null,
+)
 
 /** `<name attr="x" other={1}/>`, or the opening `<name ...>` of a call with a body. */
 data class ComponentCall(
@@ -58,6 +68,7 @@ data class ComponentCall(
     val attrs: List<ComponentAttr>,
     val closed: Boolean,
     val range: TextRange,
+    val blockIndex: Int = -1,
 )
 
 object TeraComponentScanner {
@@ -102,19 +113,25 @@ object TeraComponentScanner {
         val nameTok = g.getOrNull(i)?.takeIf { isNameLike(it) } ?: return null
         i++
         var type: String? = null
+        var typeRange: TextRange? = null
         if (isOp(g.getOrNull(i), ":")) {
             val start = i + 1
             var end = start
             while (end < g.size && !isOp(g[end], "=")) end++
-            if (end > start) type = text.substring(g[start].range.startOffset, g[end - 1].range.endOffset).trim()
+            if (end > start) {
+                typeRange = TextRange(g[start].range.startOffset, g[end - 1].range.endOffset)
+                type = text.substring(typeRange.startOffset, typeRange.endOffset).trim()
+            }
             i = end
         }
         var default: String? = null
+        var defaultRange: TextRange? = null
         if (isOp(g.getOrNull(i), "=") && i + 1 < g.size) {
-            default = text.substring(g[i + 1].range.startOffset, g.last().range.endOffset).trim()
+            defaultRange = TextRange(g[i + 1].range.startOffset, g.last().range.endOffset)
+            default = text.substring(defaultRange.startOffset, defaultRange.endOffset).trim()
         }
         return ComponentParam(nameTok.text, type, default, implicit, rest,
-            TextRange(g.first().range.startOffset, g.last().range.endOffset))
+            TextRange(g.first().range.startOffset, g.last().range.endOffset), typeRange, defaultRange)
     }
 
     // ── calls ────────────────────────────────────────────────────────────────
@@ -122,12 +139,12 @@ object TeraComponentScanner {
     /** Every `<name .../>` call: in `{{ }}`, and the opening tag of `{% <name> %}`. Closing tags are not calls. */
     fun calls(blocks: List<TeraBlock>): List<ComponentCall> {
         val out = mutableListOf<ComponentCall>()
-        for (block in blocks) {
+        for ((blockIndex, block) in blocks.withIndex()) {
             val t = block.tokens
             if (t.isEmpty()) continue
             if (block.kind == '%') {
                 if (isOp(t[0], "<")) {
-                    if (!isOp(t.getOrNull(1), "/")) parseCall(t, 0)?.let { out.add(it.first) }
+                    if (!isOp(t.getOrNull(1), "/")) parseCall(t, 0)?.let { out.add(it.first.copy(blockIndex = blockIndex)) }
                     continue
                 }
             }
@@ -142,7 +159,7 @@ object TeraComponentScanner {
                     t[i + 1].range.startOffset == t[i].range.endOffset
                 ) {
                     val parsed = parseCall(t, i)
-                    if (parsed != null) { out.add(parsed.first); i = parsed.second; continue }
+                    if (parsed != null) { out.add(parsed.first.copy(blockIndex = blockIndex)); i = parsed.second; continue }
                 }
                 i++
             }
@@ -170,7 +187,8 @@ object TeraComponentScanner {
                     if (isOp(t.getOrNull(j + 1), "=")) {
                         val v = t.getOrNull(j + 2) ?: break
                         val endIdx = if (isOp(v, "{")) matchingBrace(t, j + 2) else j + 2
-                        attrs.add(ComponentAttr(tok.text, false, TextRange(tok.range.startOffset, t[endIdx].range.endOffset), tok.range))
+                        attrs.add(ComponentAttr(tok.text, false, TextRange(tok.range.startOffset, t[endIdx].range.endOffset), tok.range,
+                            TextRange(v.range.startOffset, t[endIdx].range.endOffset)))
                         j = endIdx + 1
                     } else {
                         attrs.add(ComponentAttr(tok.text, false, tok.range, tok.range))

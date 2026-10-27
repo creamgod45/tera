@@ -7,6 +7,9 @@ class TeraUse(
     val args: List<List<TeraTok>>,
     val closed: Boolean,
     val hasParens: Boolean,
+    /** Where the use is: the block it is in and the index of the name among that block's tokens. */
+    val blockIndex: Int = -1,
+    val index: Int = -1,
 ) {
     /** `name` of a `name=value` argument group (`from` is a keyword for the lexer, so accept it too). */
     fun argName(group: List<TeraTok>): String? {
@@ -38,7 +41,7 @@ object TeraCalls {
 
     fun scan(blocks: List<TeraBlock>): List<TeraUse> {
         val out = mutableListOf<TeraUse>()
-        for (block in blocks) {
+        for ((blockIndex, block) in blocks.withIndex()) {
             val from = expressionStart(block) ?: continue
             val t = block.tokens
             val filterTag = block.kind == '%' && t.firstOrNull()?.text == "filter"
@@ -57,9 +60,9 @@ object TeraCalls {
                 }
                 if (isOp(next, "(")) {
                     val a = TeraSymbolScanner.splitArgs(t, i + 1)
-                    out.add(TeraUse(kind, tok, a.groups, a.closeIndex >= 0, true))
+                    out.add(TeraUse(kind, tok, a.groups, a.closeIndex >= 0, true, blockIndex, i))
                 } else {
-                    out.add(TeraUse(kind, tok, emptyList(), true, false))
+                    out.add(TeraUse(kind, tok, emptyList(), true, false, blockIndex, i))
                 }
             }
         }

@@ -19,9 +19,11 @@ class TeraRustFormsExampleTest : BasePlatformTestCase() {
     private fun load() {
         myFixture.addFileToProject("forms-tera2/Cargo.toml", example("Cargo.toml"))
         myFixture.addFileToProject("forms-tera2/src/main.rs", example("src/main.rs"))
-        for (n in listOf("macros", "index", "success", "page")) {
+        for (n in listOf("macros", "index", "success")) {
             myFixture.addFileToProject("forms-tera2/templates/$n.html.tera", example("templates/$n.html.tera"))
         }
+        // The page template as committed (the working copy may be edited); what matters is the `now()` in it.
+        myFixture.addFileToProject("forms-tera2/templates/page.html.tera", "{{ title }}\n{{ count }}\n\n{{ now() }}\n")
     }
 
     fun testMainRsRegistersNowFromTeraContrib() {

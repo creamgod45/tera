@@ -18,7 +18,8 @@ class TeraMigrationRocketTest : BasePlatformTestCase() {
 
     private fun errors(text: String, components: List<TeraComponent>) =
         (TeraMigration.check(text, TeraVersion.V2) + TeraComponentChecker.check(text, components) +
-            TeraExternalAnnotator().doAnnotate(text)).filter { it.severity == HighlightSeverity.ERROR }
+            TeraTypeChecker.check(text, null, components) + TeraExternalAnnotator().doAnnotate(text))
+            .filter { it.severity == HighlightSeverity.ERROR || it.severity == HighlightSeverity.WARNING }
 
     // ── the migration ────────────────────────────────────────────────────────
 

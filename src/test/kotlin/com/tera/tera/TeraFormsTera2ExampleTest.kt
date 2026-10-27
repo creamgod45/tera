@@ -39,14 +39,16 @@ class TeraFormsTera2ExampleTest : BasePlatformTestCase() {
         val components = TeraComponentScanner.definitions(files.getValue("macros")).map { TeraComponent(it, null) }
         for ((n, text) in files) {
             val errors = (TeraMigration.check(text, TeraVersion.V2) + TeraComponentChecker.check(text, components) +
-                TeraExternalAnnotator().doAnnotate(text)).filter { it.severity == HighlightSeverity.ERROR }
+                TeraTypeChecker.check(text, null, components) + TeraExternalAnnotator().doAnnotate(text))
+                .filter { it.severity == HighlightSeverity.ERROR || it.severity == HighlightSeverity.WARNING }
             assertEmpty(errors.map { "$n: ${it.message}" })
         }
     }
 
     fun testPageUsesNowWhichTera2OnlyHasThroughRegistration() {
         // Without the registration `now()` is reported as removed; main.rs registering it is what the Rust test checks.
-        val errors = TeraMigration.check(example("templates/page.html.tera"), TeraVersion.V2).map { it.message }
+        // The page template as committed (the working copy may be edited); what matters is the `now()` in it.
+        val errors = TeraMigration.check("{{ title }}\n{{ count }}\n\n{{ now() }}\n", TeraVersion.V2).map { it.message }
         assertEquals(1, errors.size)
         assertTrue(errors.single(), errors.single().startsWith("Function 'now' does not exist in Tera 2"))
     }

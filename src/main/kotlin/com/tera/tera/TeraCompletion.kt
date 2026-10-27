@@ -18,6 +18,8 @@ data class TeraSuggestion(
     val type: String = "",
     val suffix: String = "",
     val caretInSuffix: Int = suffix.length,
+    /** Offered higher (positive) or lower (negative) in the list; used to put fitting filters first. */
+    val priority: Double = 0.0,
 )
 
 /** Context analysis for completion; pure text in, suggestions out. */
@@ -116,12 +118,12 @@ object TeraCompletionEngine {
         val last = prior.lastOrNull()
         if (last != null && isOp(last, ".")) return fieldSuggestions(prior, snapshot, context)
         if (last != null && isOp(last, "|")) {
-            return TeraBuiltins.defs("filter", custom, version).map { builtinSuggestion(it, "filter", alwaysParens = false) }
+            return TeraBuiltins.defs("filter", custom, version).map { withFit(builtinSuggestion(it, it.let { "filter" }, alwaysParens = false), it, blocks, block, prior, prior.size - 1, context, snapshot, version) }
         }
         if (last != null && last.type == TeraTokenTypes.KEYWORD && (last.text == "is" ||
                 (last.text == "not" && prior.getOrNull(prior.size - 2)?.text == "is"))
         ) {
-            return TeraBuiltins.defs("test", custom, version).map { builtinSuggestion(it, "test", alwaysParens = false) }
+            return TeraBuiltins.defs("test", custom, version).map { withFit(builtinSuggestion(it, "test", alwaysParens = false), it, blocks, block, prior, prior.indexOfLast { t -> t.text == "is" }, context, snapshot, version) }
         }
         if (last != null && isOp(last, ":")) return emptyList()
         if (block.kind == '%' && first in NO_NAMESPACE_TAGS) return emptyList()
@@ -208,6 +210,19 @@ object TeraCompletionEngine {
                 when { p.implicit -> "implicit"; p.required -> "required"; else -> "default ${p.defaultText}" },
                 "attribute", if (stringy) "=\"\"" else "={}", if (stringy) 2 else 2)
         }
+    }
+
+    /** Puts filters and tests whose input kind fits the operand before the caret first, and the ones that do not last. */
+    private fun withFit(
+        s: TeraSuggestion, def: BuiltinDef, blocks: List<TeraBlock>, block: TeraBlock, prior: List<TeraTok>, bar: Int,
+        context: TeraContextResult?, snapshot: TeraScopeSnapshot, version: TeraVersion,
+    ): TeraSuggestion {
+        if (version != TeraVersion.V2 || def.input.isEmpty() || bar < 0) return s
+        val operand = TeraTypeChecker.operandBefore(prior, bar, 0)
+        if (operand.isEmpty()) return s
+        val literal = TeraTypeRules.literalKind(operand)?.takeIf { it != "none" }?.let { if (it == "integer" || it == "float") "number" else it }
+        val kind = literal ?: TeraTypeRules.kindOf(TeraScopes.evalType(operand, snapshot, context)) ?: return s
+        return s.copy(priority = if (TeraTypeRules.accepts(def.input, kind)) 1.0 else -1.0)
     }
 
     private fun builtinSuggestion(def: BuiltinDef, kind: String, alwaysParens: Boolean): TeraSuggestion {
@@ -323,7 +338,7 @@ class TeraCompletionContributor : CompletionContributor() {
                             }
                         }
                     }
-                    result.addElement(item)
+                    result.addElement(if (s.priority != 0.0) com.intellij.codeInsight.completion.PrioritizedLookupElement.withPriority(item, s.priority) else item)
                 }
             }
         })

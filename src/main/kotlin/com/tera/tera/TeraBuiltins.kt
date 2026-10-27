@@ -17,7 +17,14 @@ class BuiltinDef(
     val source: String? = null,
     /** Longer documentation, e.g. the Rust doc comment of a registered function. */
     val details: String? = null,
+    /**
+     * Kinds of value this filter or test accepts as its input (`string`, `number`, `array`, `map`, `bool`);
+     * empty means anything. Tera 2 rejects other kinds when rendering.
+     */
+    val input: List<String> = emptyList(),
 ) {
+    fun withInput(kinds: List<String>) = BuiltinDef(name, description, params, example, positional, source, details, kinds)
+
     val required: List<BuiltinParam> get() = params.filter { it.required }
 
     fun signature(): String =
@@ -211,7 +218,8 @@ object TeraBuiltins {
         ), """{{ throw(message="missing title") }}"""),
     )
 
-    val FILTER_DEFS_V2: List<BuiltinDef> = listOf(
+    val FILTER_DEFS_V2: List<BuiltinDef> by lazy { FILTER_DEFS_V2_PLAIN.map { it.withInput(V2_FILTER_INPUT[it.name].orEmpty()) } }
+    private val FILTER_DEFS_V2_PLAIN: List<BuiltinDef> = listOf(
         BuiltinDef("abs", "absolute value"),
         BuiltinDef("capitalize", "uppercase the first character, lowercase the rest"),
         BuiltinDef("default", "fallback value when undefined", listOf(
@@ -276,7 +284,8 @@ object TeraBuiltins {
         BuiltinDef("wordcount", "count words"),
     )
 
-    val TEST_DEFS_V2: List<BuiltinDef> = listOf(
+    val TEST_DEFS_V2: List<BuiltinDef> by lazy { TEST_DEFS_V2_PLAIN.map { it.withInput(V2_TEST_INPUT[it.name].orEmpty()) } }
+    private val TEST_DEFS_V2_PLAIN: List<BuiltinDef> = listOf(
         BuiltinDef("array", "is an array"),
         BuiltinDef("bool", "is a boolean"),
         BuiltinDef("containing", "contains a value", listOf(req("pat", "value to look for")), "{% if tags is containing(pat=\"rust\") %}"),
@@ -333,6 +342,22 @@ object TeraBuiltins {
         "Matching" to ("test" to BuiltinDef("matching", "matches a regex", listOf(req("pat", "regular expression")))),
         "RegexReplace" to ("filter" to BuiltinDef("regex_replace", "replace regex matches", listOf(
             req("pattern", "regular expression"), req("rep", "replacement")))),
+    )
+
+    /** What the Tera 2 filters demand of their input, from the parameter types in tera 2.4.0's `filters.rs`. */
+    private val V2_FILTER_INPUT: Map<String, List<String>> = buildMap {
+        for (n in listOf("wordcount", "escape_html", "escape_xml", "newlines_to_br", "truncate", "split", "safe", "upper", "lower",
+            "escape", "trim", "trim_start", "trim_end", "replace", "capitalize", "title", "indent")) put(n, listOf("string"))
+        for (n in listOf("first", "last", "nth", "join", "sort", "unique", "group_by")) put(n, listOf("array"))
+        for (n in listOf("get", "values", "keys", "pairs")) put(n, listOf("map"))
+        for (n in listOf("round", "abs", "pluralize")) put(n, listOf("number"))
+        put("reverse", listOf("string", "array"))
+        put("length", listOf("string", "array", "map"))
+        put("float", listOf("string", "number"))
+    }
+    private val V2_TEST_INPUT: Map<String, List<String>> = mapOf(
+        "odd" to listOf("number"), "even" to listOf("number"), "divisible_by" to listOf("number"),
+        "starting_with" to listOf("string"), "ending_with" to listOf("string"),
     )
 
     val FILTERS: Map<String, String> = FILTER_DEFS.associate { it.name to it.description }

@@ -200,6 +200,7 @@ object TeraDocumentation {
         } else {
             section(sb, "Arguments:", "none")
         }
+        if (def.input.isNotEmpty()) section(sb, "Input:", "<code>${esc(def.input.joinToString(" or "))}</code> – other kinds of value are rejected when rendering")
         def.example?.let { section(sb, "Example:", "<code>${esc(it)}</code>") }
         section(sb, "Source:", def.source?.let { "registered in Rust (${esc(it)})" } ?: "Tera built-in ${esc(ref.kind)}")
         sb.append(DocumentationMarkup.SECTIONS_END)
