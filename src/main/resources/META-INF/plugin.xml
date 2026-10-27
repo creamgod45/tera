@@ -124,6 +124,11 @@
         <!-- 跳转到定义：宏、命名空间、参数、模板路径（多个来源时弹出列表） -->
         <gotoDeclarationHandler implementation="com.tera.tera.TeraGotoDeclarationHandler"/>
 
+        <!-- From the Rust string that names a template (render("pages/x", ..)): open the template -->
+        <gotoDeclarationHandler implementation="com.tera.tera.TeraRustTemplateGotoHandler"/>
+        <codeInsight.lineMarkerProvider language="Rust"
+                                        implementationClass="com.tera.tera.TeraRustTemplateLineMarkerProvider"/>
+
         <!-- Gutter: usages of a component on its definition, the definition on a call -->
         <codeInsight.lineMarkerProvider language="Tera"
                                         implementationClass="com.tera.tera.TeraComponentLineMarkerProvider"/>

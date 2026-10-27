@@ -45,3 +45,43 @@ class TeraRustAnyRenderFunctionTest : BasePlatformTestCase() {
         """.trimIndent()))
     }
 }
+
+/** From the Rust string that names a template: open it. */
+class TeraRustTemplateStringNavigationTest : BasePlatformTestCase() {
+
+    private fun load() {
+        myFixture.addFileToProject("app/Cargo.toml", "[package]\nname=\"app\"\n")
+        myFixture.addFileToProject("app/Rocket.toml", "[default]\ntemplate_dir = \"views\"\n")
+        myFixture.addFileToProject("app/views/pages/x.html.tera", "{{ one }}")
+        myFixture.addFileToProject("app/src/main.rs", """
+            use serde::Serialize;
+            #[derive(Serialize)] struct D { one: String }
+            fn show(name: &str, d: impl Serialize) {}
+            fn go() { show("pages/x.html", D { one: String::new() }); let other = "not a template"; }
+        """.trimIndent())
+    }
+
+    fun testTheGutterOfTheStringOpensTheTemplate() {
+        load()
+        myFixture.configureFromExistingVirtualFile(myFixture.findFileInTempDir("app/src/main.rs"))
+        val tips = myFixture.findAllGutters().mapNotNull { it.tooltipText }.filter { it.startsWith("Open template") }
+        assertEquals(tips.toString(), 1, tips.size)
+        assertTrue(tips.single(), tips.single().contains("x.html.tera") && tips.single().contains("`views`"))
+    }
+
+    fun testCmdClickOnTheStringGoesToTheTemplate() {
+        load()
+        myFixture.configureFromExistingVirtualFile(myFixture.findFileInTempDir("app/src/main.rs"))
+        myFixture.editor.caretModel.moveToOffset(myFixture.file.text.indexOf("pages/x") + 2)
+        val target = com.intellij.codeInsight.navigation.actions.GotoDeclarationAction.findTargetElement(
+            project, myFixture.editor, myFixture.editor.caretModel.offset)
+        assertEquals("x.html.tera", target?.containingFile?.name)
+    }
+
+    fun testTheContextComesFromTheConfiguredRoot() {
+        load()
+        val t = myFixture.findFileInTempDir("app/views/pages/x.html.tera")
+        val vars = com.tera.tera.TeraContexts.forFile(myFixture.psiManager.findFile(t)!!)?.variables?.map { it.name }
+        assertEquals(listOf("one"), vars)
+    }
+}

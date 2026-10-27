@@ -198,6 +198,12 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
 - **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and
   opens a list of the call sites; Cmd+click on the definition's name lists them too. Calls get a gutter icon back to the
   definition.
+- **Open the template from the Rust string.** Cmd+click on `"pages/detail.html"` in `render(..)` (or the gutter icon
+  beside it) opens the template; several matches (`macros.html.tera`, `macros.txt.tera`) give a list. The path is read
+  the way the program would: `template_dir` from `Rocket.toml` or `.merge(("template_dir", ..))`, the directory of
+  `Tera::new("views/..")` (also `concat!(env!("CARGO_MANIFEST_DIR"), ..)`), `relative!(..)`, and a changed working
+  directory (`std::env::set_current_dir("site")`, Rust's `chdir`), tried before the crate directory; each crate of a
+  workspace keeps its own.
 - **Variables of layouts and pages.** Render calls are found by meaning, not by the name of the function: any call that
   is given a template's path as a string and whose callee takes something serializable (`impl Serialize`, `T: Serialize`,
   `tera::Context`, `serde_json::Value`) is a render site, and that argument is the context (so `paint(&data, "a")`,

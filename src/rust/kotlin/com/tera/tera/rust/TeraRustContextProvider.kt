@@ -69,7 +69,7 @@ class TeraRustContextProvider : TeraContextProvider {
 
     override fun resolve(project: Project, template: VirtualFile): TeraContextResult? {
         if (DumbService.isDumb(project)) return null
-        val sites = renderSites(project, templateNames(template))
+        val sites = renderSites(project, templateNames(template) + com.tera.tera.TeraTemplateRoots.namesOf(project, template))
         if (sites.isEmpty()) return null
         val vars = linkedMapOf<String, TeraField>()
         var complete = true
