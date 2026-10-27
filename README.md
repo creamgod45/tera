@@ -207,6 +207,10 @@ capturing `set` fold down to their end tag; and live templates (type the abbrevi
 - **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and
   opens a list of the call sites; Cmd+click on the definition's name lists them too. Calls get a gutter icon back to the
   definition.
+- **Template roots by hand.** Settings → Languages & Frameworks → Tera → *Template roots* takes one directory per line
+  (relative to the project, or absolute). Template names in `extends`, `include`, `import` and in Rust's `render("..")`
+  are read against these first, then against what is detected below, then `templates`; the gutter tooltip in Rust says
+  which setting decided.
 - **Open the template from the Rust string.** Cmd+click on `"pages/detail.html"` in `render(..)` (or the gutter icon
   beside it) opens the template; several matches (`macros.html.tera`, `macros.txt.tera`) give a list. The path is read
   the way the program would: `template_dir` from `Rocket.toml` or `.merge(("template_dir", ..))`, the directory of

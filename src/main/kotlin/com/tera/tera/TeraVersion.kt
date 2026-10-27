@@ -183,6 +183,13 @@ class TeraSettingsState {
 
     /** In 1.x projects, point out constructs that Tera 2 removed or renamed. */
     var migrationHints: Boolean = true
+
+    /**
+     * Template roots chosen by hand, one per line: relative to the project, or absolute. Template names in `extends`,
+     * `include`, `import` and in Rust's `render("..")` are read against these first, then against what the plugin
+     * detects from `Rocket.toml`, `Tera::new(..)` and the working directory.
+     */
+    var templateRoots: String = ""
 }
 
 @Service(Service.Level.PROJECT)

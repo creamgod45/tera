@@ -1,6 +1,7 @@
 package com.tera.tera
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.util.CachedValueProvider
@@ -77,11 +78,21 @@ object TeraTemplateRoots {
      * The template roots that exist, for a Rust file [from] (null: the whole project). Each is resolved against the
      * working directory first when the project changes it, then against the crate directory.
      */
+    /** The roots from Settings → Tera, that exist. */
+    fun manual(project: Project): List<Root> {
+        val base = project.guessProjectDir()
+        return TeraSettings.getInstance(project).state.templateRoots.lines().map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { line ->
+            val dir = (if (line.startsWith("/")) LocalFileSystem.getInstance().findFileByPath(line) else base?.findFileByRelativePath(line.removePrefix("./")))
+            dir?.takeIf { it.isDirectory }?.let { Root(it, "Settings → Tera (`$line`)") }
+        }
+    }
+
     fun roots(project: Project, from: VirtualFile?): List<Root> {
         val config = config(project)
         val crates = from?.let { listOfNotNull(crateDir(it)) }
             ?: TeraFiles.projectFiles(project, "toml").filter { it.name == "Cargo.toml" }.mapNotNull { it.parent }
         val out = linkedMapOf<VirtualFile, Root>()
+        manual(project).forEach { out.putIfAbsent(it.dir, it) }
         for (crate in crates) {
             val bases = config.workDirs.mapNotNull { w -> relative(crate, w)?.takeIf { it.isDirectory }?.let { it to "working directory $w" } } +
                 (crate to "the crate directory")
@@ -94,7 +105,7 @@ object TeraTemplateRoots {
     }
 
     /** Candidate files of a template path written in Rust: an exact path, then the same path with other extensions. */
-    private fun inRoot(root: VirtualFile, name: String): List<VirtualFile> {
+    fun inRoot(root: VirtualFile, name: String): List<VirtualFile> {
         val rel = name.trim().removePrefix("./").trimStart('/')
         if (rel.isEmpty()) return emptyList()
         val found = linkedSetOf<VirtualFile>()

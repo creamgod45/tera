@@ -194,3 +194,18 @@ class TeraRustFilterReturnsTest : BasePlatformTestCase() {
         assertNull(returns("fn f(v: &Value, _: &HashMap<String, Value>) -> Result<Value> { Ok(v.clone()) }\n$register", "f"))
     }
 }
+
+class TeraRustManualRootTest : BasePlatformTestCase() {
+    fun testAHandChosenRootDecidesTheTemplateNameForTheContext() {
+        com.tera.tera.TeraSettings.getInstance(project).loadState(com.tera.tera.TeraSettingsState())
+        com.tera.tera.TeraSettings.getInstance(project).state.templateRoots = "site/pages-dir"
+        myFixture.addFileToProject("site/src/main.rs", """
+            use serde::Serialize;
+            #[derive(Serialize)] struct D { one: String }
+            fn show(name: &str, d: impl Serialize) {}
+            fn go() { show("blog/post", D { one: String::new() }); }
+        """.trimIndent())
+        val t = myFixture.addFileToProject("site/pages-dir/blog/post.html.tera", "")
+        assertEquals(listOf("one"), TeraRustContextProvider().resolve(project, t.virtualFile)?.variables?.map { it.name })
+    }
+}

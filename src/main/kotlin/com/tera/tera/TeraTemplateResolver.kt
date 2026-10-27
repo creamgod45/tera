@@ -19,6 +19,13 @@ object TeraTemplateResolver {
     fun resolveAll(from: VirtualFile, name: String): List<VirtualFile> {
         val rel = name.trim().trimStart('/')
         if (rel.isEmpty()) return emptyList()
+        // Roots chosen in Settings → Tera come first.
+        com.intellij.openapi.project.ProjectLocator.getInstance().guessProjectForFile(from)?.let { project ->
+            for (root in TeraTemplateRoots.manual(project)) {
+                val hits = TeraTemplateRoots.inRoot(root.dir, rel)
+                if (hits.isNotEmpty()) return hits
+            }
+        }
         val base = rel.substringAfterLast('/')
         var dir = from.parent
         while (dir != null) {
@@ -38,7 +45,9 @@ object TeraTemplateResolver {
     /** Template names usable in `import`/`extends`/`include`, relative to the nearest `templates` folder. */
     fun templateNames(from: VirtualFile): List<String> {
         var root = from.parent ?: return emptyList()
-        var probe: VirtualFile? = root
+        val manual = com.intellij.openapi.project.ProjectLocator.getInstance().guessProjectForFile(from)?.let { TeraTemplateRoots.manual(it) }.orEmpty()
+        manual.firstOrNull { com.intellij.openapi.vfs.VfsUtilCore.isAncestor(it.dir, from, true) }?.let { root = it.dir }
+        var probe: VirtualFile? = if (manual.any { it.dir == root }) null else root
         while (probe != null) {
             if (probe.name == "templates") { root = probe; break }
             probe = probe.parent

@@ -25,7 +25,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
   - 1.4.4 Tests: expand each template; version filter works
 - Done when: all four work in a real template, README lists them.
 
-## 2. Template roots setting (S–M)
+## 2. Template roots setting (S–M) — done
 
 - 2.1 Settings page field "Template roots" (S)
   - 2.1.1 List of directories, relative to the project
