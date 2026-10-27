@@ -209,6 +209,14 @@ parent template, following the `extends` chain through templates that do not def
 lists the templates that override it. Gutter icons show *Overrides block x in base.html* and *Block x is overridden in
 N templates*.
 
+### Errors in the Run window
+
+When a Rust program prints a template error, the position becomes a link to the template: Tera 2's
+` --> pages/detail.html:30:49` (also behind Rocket's `>> template 'x': error:`), Tera 1's `Failed to parse 'x'` followed by
+` --> 3:10`, and the template names in `Failed to render 'x'` / `while rendering 'x'`. Names are read against the template
+roots; text that names no template of the project is left alone. (The Run tool window; the terminal tool window has its
+own link handling and is not covered.) The samples in `src/test/resources/errors` are the real output of Tera 1.20.1 and 2.4.0.
+
 ### Reformat Code
 
 Reformat Code (Cmd+Alt+L) re-indents a template by the nesting of its HTML tags and Tera tags (`block`, `for`, `if` with

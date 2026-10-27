@@ -1,0 +1,7 @@
+   >> Matched: (detail) GET /requests/<id>
+   >> template 'pages/detail.html': error: Field `title` is not defined.
+  --> pages/detail.html:30:49
+   |
+30 |           <p class="text-sm font-semibold">{{ s.title }} <span class="font-normal text-slate-400">by {{ s.who }} · {{ s.when }}</span></p>
+   |                                                 ^^^^^
+   >> Outcome: Error(500 Internal Server Error)

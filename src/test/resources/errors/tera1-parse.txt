@@ -1,0 +1,7 @@
+Failed to parse 'pages/bad.html'
+  Reason:  --> 3:10
+  |
+3 | <b>{{ y </b>
+  |          ^---
+  |
+  = expected an expression or a string or a concatenation of strings

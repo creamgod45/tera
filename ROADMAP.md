@@ -83,7 +83,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
 - 5.4 Tests and README (S)
 - Done when: Reformat Code never changes the meaning of a template.
 
-## 6. Clickable runtime errors (S–M)
+## 6. Clickable runtime errors (S–M) — done
 
 - 6.1 Error formats (S)
   - 6.1.1 Tera 2 `--> file:line:col` blocks, Tera 1 chained errors, Rocket's `template 'x': error:` line

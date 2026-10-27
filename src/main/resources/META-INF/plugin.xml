@@ -139,6 +139,9 @@
         <backspaceHandlerDelegate implementation="com.tera.tera.TeraBackspaceHandler"/>
         <lang.foldingBuilder language="Tera" implementationClass="com.tera.tera.TeraFoldingBuilder"/>
 
+        <!-- Template errors in the Run window become links -->
+        <consoleFilterProvider implementation="com.tera.tera.TeraConsoleFilterProvider"/>
+
         <!-- Reformat Code: indentation by tag nesting, nothing else -->
         <postFormatProcessor implementation="com.tera.tera.TeraPostFormatProcessor"/>
 
