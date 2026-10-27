@@ -119,20 +119,27 @@ class TeraRustContextProvider : TeraContextProvider {
      */
     private fun renderSites(project: Project, names: Set<String>): List<Site> {
         val pattern = Regex("\"(?:" + names.joinToString("|") { Regex.escape(it) } + ")\"")
+        val constDecl = Regex("""\b(?:const|static)\s+([A-Za-z_]\w*)\s*:\s*&(?:\s*'static)?\s*str\s*=\s*"([^"]*)"""")
+        val files = TeraFiles.projectFiles(project, "rs").filter { "/target/" !in it.path }.map { it to TeraFiles.textOf(it) }
+        // `const PAGE: &str = "pages/x";` ... `render(PAGE, ctx)`: the constant stands for the path.
+        val constants = files.flatMap { (_, t) -> constDecl.findAll(t).filter { it.groupValues[2] in names }.map { it.groupValues[1] }.toList() }.toSet()
+        val constUse = if (constants.isEmpty()) null else Regex("\\b(?:" + constants.joinToString("|") { Regex.escape(it) } + ")\\b")
         val result = mutableListOf<Site>()
-        for (vf in TeraFiles.projectFiles(project, "rs")) {
-            if ("/target/" in vf.path) continue
-            val text = TeraFiles.textOf(vf)
-            val matches = pattern.findAll(text).toList()
-            if (matches.isEmpty()) continue
+        for ((vf, text) in files) {
+            val hits = pattern.findAll(text).map { it.range.first + 1 }.toList() +
+                constUse?.findAll(text)?.map { it.range.first }?.toList().orEmpty()
+            if (hits.isEmpty()) continue
             val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
-            for (m in matches) {
-                val literal = PsiTreeUtil.getParentOfType(psi.findElementAt(m.range.first + 1), RsLitExpr::class.java, false) ?: continue
-                val list = literal.parent as? RsValueArgumentList ?: continue
+            for (at in hits) {
+                val leaf = psi.findElementAt(at) ?: continue
+                val named = PsiTreeUtil.getParentOfType(leaf, RsLitExpr::class.java, false)
+                    ?: PsiTreeUtil.getParentOfType(leaf, RsPathExpr::class.java, false)?.takeIf { it.path.referenceName in constants }
+                    ?: continue
+                val list = named.parent as? RsValueArgumentList ?: continue
                 val args = list.exprList
                 val callee = RustCallees.resolve(list.parent)
-                val arg = RustCallees.contextArgument(list.parent, callee, args, args.indexOf(literal)) ?: continue
-                result.add(Site(vf, arg, text.substring(0, m.range.first).count { it == '\n' } + 1))
+                val arg = RustCallees.contextArgument(list.parent, callee, args, args.indexOf(named)) ?: continue
+                result.add(Site(vf, arg, text.substring(0, at).count { it == '\n' } + 1))
             }
         }
         return result

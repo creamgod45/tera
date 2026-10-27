@@ -204,6 +204,9 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
   `Tera::new("views/..")` (also `concat!(env!("CARGO_MANIFEST_DIR"), ..)`), `relative!(..)`, and a changed working
   directory (`std::env::set_current_dir("site")`, Rust's `chdir`), tried before the crate directory; each crate of a
   workspace keeps its own.
+- **Template paths while typing.** Inside the string of a call, `show("pa|")` offers the project's templates, written
+  the way the project already writes them (`pages/detail.html` if its strings carry the extension, Rocket's
+  `pages/detail` otherwise). A `const PAGE: &str = "pages/x";` passed to the call counts as the path too.
 - **Variables of layouts and pages.** Render calls are found by meaning, not by the name of the function: any call that
   is given a template's path as a string and whose callee takes something serializable (`impl Serialize`, `T: Serialize`,
   `tera::Context`, `serde_json::Value`) is a render site, and that argument is the context (so `paint(&data, "a")`,

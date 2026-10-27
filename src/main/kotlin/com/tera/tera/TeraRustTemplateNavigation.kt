@@ -71,3 +71,66 @@ class TeraRustTemplateLineMarkerProvider : RelatedItemLineMarkerProvider() {
         )
     }
 }
+
+/**
+ * Template paths while typing inside the string of a call in Rust: `render("pa|")` offers `pages/detail`. The names are
+ * relative to the project's template roots, written the way the project already writes them: with the extension
+ * (`pages/detail.html`) if its existing strings do, without (Rocket's `pages/detail`) otherwise.
+ */
+class TeraRustTemplateCompletionContributor : com.intellij.codeInsight.completion.CompletionContributor() {
+    override fun fillCompletionVariants(
+        parameters: com.intellij.codeInsight.completion.CompletionParameters,
+        result: com.intellij.codeInsight.completion.CompletionResultSet,
+    ) {
+        val file = parameters.originalFile
+        if (!TeraRustTemplateStrings.isRust(file)) return
+        val vFile = file.virtualFile ?: return
+        val text = parameters.editor.document.text
+        val caret = parameters.offset
+        val lineStart = text.lastIndexOf('\n', caret - 1) + 1
+        val before = text.substring(lineStart, caret)
+        // Inside a plain string (an odd number of unescaped quotes so far) that is an argument of a call.
+        val quotes = Regex("""(?<!\\)"""").findAll(before).toList()
+        if (quotes.size % 2 == 0) return
+        val open = quotes.last().range.first
+        if (!before.substring(0, open).trimEnd().let { it.endsWith("(") || it.endsWith(",") }) return
+        val typed = before.substring(open + 1)
+
+        val project = parameters.editor.project ?: return
+        val roots = TeraTemplateRoots.roots(project, vFile)
+        if (roots.isEmpty()) return
+        val withExtension = writesExtensions(project, roots)
+        val matcher = result.withPrefixMatcher(typed)
+        val seen = linkedSetOf<String>()
+        for (root in roots) {
+            fun walk(dir: com.intellij.openapi.vfs.VirtualFile, prefix: String) {
+                for (child in dir.children.sortedBy { it.name }) {
+                    if (child.isDirectory) { walk(child, "$prefix${child.name}/"); continue }
+                    if (!child.name.endsWith(".tera")) continue
+                    val name = prefix + if (withExtension) child.name.removeSuffix(".tera") else child.name.substringBefore('.')
+                    if (!seen.add(name)) continue
+                    matcher.addElement(
+                        com.intellij.codeInsight.lookup.LookupElementBuilder.create(name)
+                            .withIcon(TeraIcons.FILE).withTypeText(child.name, true),
+                    )
+                }
+            }
+            walk(root.dir, "")
+        }
+    }
+
+    /** Does the project name its templates with the extension (`pages/x.html`) rather than Rocket's bare `pages/x`? */
+    private fun writesExtensions(project: com.intellij.openapi.project.Project, roots: List<TeraTemplateRoots.Root>): Boolean {
+        val literal = Regex(""""([\w./-]+)"""")
+        var with = 0
+        var bare = 0
+        for (f in TeraFiles.projectFiles(project, "rs").filter { "/target/" !in it.path }) {
+            for (m in literal.findAll(TeraFiles.textOf(f))) {
+                val name = m.groupValues[1]
+                if (roots.none { r -> r.dir.findFileByRelativePath(name + ".tera") != null || r.dir.findFileByRelativePath(name)?.isDirectory == false || r.dir.children.any { c -> c.name.startsWith(name.substringAfterLast('/') + ".") } }) continue
+                if (name.substringAfterLast('/').contains('.')) with++ else bare++
+            }
+        }
+        return with > bare
+    }
+}

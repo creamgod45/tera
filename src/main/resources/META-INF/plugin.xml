@@ -129,6 +129,9 @@
         <codeInsight.lineMarkerProvider language="Rust"
                                         implementationClass="com.tera.tera.TeraRustTemplateLineMarkerProvider"/>
 
+        <completion.contributor language="Rust"
+                                implementationClass="com.tera.tera.TeraRustTemplateCompletionContributor"/>
+
         <!-- Gutter: usages of a component on its definition, the definition on a call -->
         <codeInsight.lineMarkerProvider language="Tera"
                                         implementationClass="com.tera.tera.TeraComponentLineMarkerProvider"/>
