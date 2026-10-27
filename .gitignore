@@ -60,3 +60,4 @@ $RECYCLE.BIN/
 
 ### Rust verification tool build output ###
 tools/**/target/
+examples/**/target/

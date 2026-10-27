@@ -152,6 +152,10 @@ Example, Rocket's `examples/forms` (`macros.html.tera`, `index.html.tera`, `succ
 {% if f is containing(value) %}                     →  {% if f is containing(pat=value) %}
 ```
 
+**`examples/forms-tera2`** is the whole example as a runnable Rocket 0.5 + Tera 2.4 application (`cargo run`, `cargo test`: real form
+`Context`, real multipart uploads, escaping, components), with the Rust side changed as well because `rocket_dyn_templates` is
+Tera 1 only; its README lists every difference.
+
 The migrated files are in `src/test/resources/rocket-tera2` (see its README for every change). They are golden files in the
 tests, and `tools/verify-migration` renders the originals with Tera 1.20.1 and the migrated files with Tera 2.4.0: the
 output is identical, except that Tera 2 prints an array as JSON.

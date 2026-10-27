@@ -1,0 +1,16 @@
+[package]
+name = "forms-tera2"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Standalone: not part of any workspace above this directory.
+[workspace]
+
+[dependencies]
+rocket = "0.5"
+# Rocket's `rocket_dyn_templates` still uses Tera 1, so this example uses Tera 2 directly.
+# `preserve_order` keeps the order of the form context (an IndexMap in Rocket) when iterating it.
+tera = { version = "2.4", features = ["preserve_order"] }
+# `now()` was a built-in function in Tera 1; in Tera 2 it lives in tera-contrib.
+tera-contrib = { version = "0.3", features = ["date"] }
