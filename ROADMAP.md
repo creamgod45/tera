@@ -52,7 +52,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
 - 3.4 Tests: three-level chain, missing parent, two children (S)
 - Done when: review-poc `layouts/section` blocks navigate both ways.
 
-## 4. Find usages and rename (L)
+## 4. Find usages and rename (L) — done (4.1.2 decision: identifier tokens are leaf elements of their own kind that know from a per-file analysis whether they declare or refer to a name; dotted component names use a rename handler with text edits)
 
 - 4.1 One symbol model (M)
   - 4.1.1 Symbols: macro, block, component, `set`/`for` variable, template file

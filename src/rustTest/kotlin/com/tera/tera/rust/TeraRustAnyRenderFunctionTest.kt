@@ -209,3 +209,43 @@ class TeraRustManualRootTest : BasePlatformTestCase() {
         assertEquals(listOf("one"), TeraRustContextProvider().resolve(project, t.virtualFile)?.variables?.map { it.name })
     }
 }
+
+/** Renaming or moving a template updates the Rust strings that name it. */
+class TeraRustRenameTemplateTest : BasePlatformTestCase() {
+
+    private fun text(path: String) = com.tera.tera.TeraFiles.textOf(myFixture.findFileInTempDir(path))
+
+    private fun load() {
+        com.tera.tera.TeraSettings.getInstance(project).loadState(com.tera.tera.TeraSettingsState())
+        myFixture.addFileToProject("app/Cargo.toml", "[package]\nname=\"app\"\n")
+        myFixture.addFileToProject("app/templates/pages/detail.html.tera", "x")
+        myFixture.addFileToProject("app/templates/ui/keep.txt", "")
+        myFixture.addFileToProject("app/src/main.rs", """
+            fn show(name: &str, v: u8) {}
+            fn go() { show("pages/detail.html", 1); show("pages/detail", 2); show("pages/other", 3); }
+        """.trimIndent())
+    }
+
+    fun testTheStringIsAReferenceToTheFile() {
+        load()
+        myFixture.configureFromExistingVirtualFile(myFixture.findFileInTempDir("app/src/main.rs"))
+        val ref = myFixture.file.findReferenceAt(myFixture.file.text.indexOf("pages/detail.html") + 3)
+        assertEquals("detail.html.tera", (ref?.resolve() as? com.intellij.psi.PsiFile)?.name)
+        assertNull(myFixture.file.findReferenceAt(myFixture.file.text.indexOf("pages/other") + 3))
+    }
+
+    fun testRenamingTheTemplateUpdatesTheRustStrings() {
+        load()
+        myFixture.configureFromExistingVirtualFile(myFixture.findFileInTempDir("app/templates/pages/detail.html.tera"))
+        myFixture.renameElement(myFixture.file, "view.html.tera")
+        val rust = text("app/src/main.rs")
+        assertTrue(rust, rust.contains("show(\"pages/view.html\", 1)") && rust.contains("show(\"pages/view\", 2)") && rust.contains("\"pages/other\""))
+    }
+
+    fun testMovingTheTemplateUpdatesTheRustStrings() {
+        load()
+        myFixture.moveFile("app/templates/pages/detail.html.tera", "app/templates/ui")
+        val rust = text("app/src/main.rs")
+        assertTrue(rust, rust.contains("show(\"ui/detail.html\", 1)") && rust.contains("show(\"ui/detail\", 2)"))
+    }
+}

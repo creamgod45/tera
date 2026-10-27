@@ -145,6 +145,14 @@
         <liveTemplateContext contextId="TERA_V2" baseContextId="TERA" implementation="com.tera.tera.TeraV2TemplateContext"/>
         <defaultLiveTemplates file="liveTemplates/Tera"/>
 
+        <!-- Find Usages and Rename of blocks, macros and variables -->
+        <lang.findUsagesProvider language="Tera" implementationClass="com.tera.tera.TeraFindUsagesProvider"/>
+        <lang.namesValidator language="Tera" implementationClass="com.tera.tera.TeraNamesValidator"/>
+        <renameHandler implementation="com.tera.tera.TeraComponentRenameHandler"/>
+        <referencesSearch implementation="com.tera.tera.TeraTemplateReferencesSearcher"/>
+        <renamePsiElementProcessor implementation="com.tera.tera.TeraRenameProcessor"/>
+        <targetElementEvaluator language="Tera" implementationClass="com.tera.tera.TeraTargetElementEvaluator"/>
+
         <!-- Gutter: block overrides along the extends chain -->
         <codeInsight.lineMarkerProvider language="Tera"
                                         implementationClass="com.tera.tera.TeraBlockLineMarkerProvider"/>

@@ -3,4 +3,7 @@
     <extensions defaultExtensionNs="com.tera">
         <contextProvider implementation="com.tera.tera.rust.TeraRustContextProvider"/>
     </extensions>
+    <extensions defaultExtensionNs="com.intellij">
+        <psi.referenceContributor language="Rust" implementation="com.tera.tera.rust.TeraRustTemplateReferenceContributor"/>
+    </extensions>
 </idea-plugin>

@@ -209,6 +209,15 @@ parent template, following the `extends` chain through templates that do not def
 lists the templates that override it. Gutter icons show *Overrides block x in base.html* and *Block x is overridden in
 N templates*.
 
+### Find Usages and Rename
+
+Shift+F6 and Alt+F7 work on: **blocks** (the topmost definition along `extends` is the declaration; overrides and every
+`endblock x` follow, across files), **macros** in Tera 1 (definition, `ns::name(` calls, `endmacro`), the **variables**
+that `set`, `set_global`, `for` and macro parameters declare, and **components** (definition, both call forms and the
+closing tags `{% </ui.card> %}`, in one undoable command, refusing a name that is taken). Renaming or moving a
+**template file** updates the template names in `extends`/`include`/`import` (written with or without the extension) and
+the Rust strings that name it (`render("pages/detail.html", ..)`, in RustRover).
+
 ### Usages and render contexts
 
 - **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and

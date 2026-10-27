@@ -119,6 +119,13 @@ object TeraTemplateRoots {
         return found.toList()
     }
 
+    /** Like [resolve], but only against the roots: what a reference can claim without scanning the project. */
+    fun resolveInRoots(project: Project, from: VirtualFile?, name: String): List<VirtualFile> {
+        if (name.isBlank() || name.length > 200) return emptyList()
+        for (root in roots(project, from)) inRoot(root.dir, name).takeIf { it.isNotEmpty() }?.let { return it }
+        return emptyList()
+    }
+
     /** The template files [name] (as written in a Rust string) refers to, with the root that explains it. */
     fun resolve(project: Project, from: VirtualFile?, name: String): List<Pair<VirtualFile, String>> {
         if (name.isBlank() || name.length > 200 || name.any { it == '\n' || it == '{' }) return emptyList()
