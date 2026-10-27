@@ -139,6 +139,9 @@
         <backspaceHandlerDelegate implementation="com.tera.tera.TeraBackspaceHandler"/>
         <lang.foldingBuilder language="Tera" implementationClass="com.tera.tera.TeraFoldingBuilder"/>
 
+        <!-- Reformat Code: indentation by tag nesting, nothing else -->
+        <postFormatProcessor implementation="com.tera.tera.TeraPostFormatProcessor"/>
+
         <!-- Live templates (Tab): common ones, and the ones for Tera 1 or Tera 2 only -->
         <liveTemplateContext contextId="TERA" implementation="com.tera.tera.TeraTemplateContext"/>
         <liveTemplateContext contextId="TERA_V1" baseContextId="TERA" implementation="com.tera.tera.TeraV1TemplateContext"/>

@@ -70,7 +70,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
 - 4.5 Tests per symbol kind (M)
 - Done when: renaming `ui.card` or `layouts/app` updates every use without leaving a broken name.
 
-## 5. Formatting (M)
+## 5. Formatting (M) — done (5.1 finding: Reformat Code did nothing on a template; 5.2 decision: a conservative indenter run as a post-format processor, not djLint and not a formatting model, which broke whitespace-sensitive content)
 
 - 5.1 Find out what happens today (S)
   - 5.1.1 Reformat review-poc templates with the HTML formatter; record what breaks

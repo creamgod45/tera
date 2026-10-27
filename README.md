@@ -209,6 +209,14 @@ parent template, following the `extends` chain through templates that do not def
 lists the templates that override it. Gutter icons show *Overrides block x in base.html* and *Block x is overridden in
 N templates*.
 
+### Reformat Code
+
+Reformat Code (Cmd+Alt+L) re-indents a template by the nesting of its HTML tags and Tera tags (`block`, `for`, `if` with
+`elif`/`else`, `macro`, `component`, `filter`, `{% <name> %}` bodies, a capturing `set`), using the HTML code style's
+indent size. It changes nothing but the whitespace at the start of lines: no line is joined or split, and the bodies of
+`pre`, `textarea`, `script` and `style`, `{% raw %}`, comments and the continuation lines of a tag that spans lines keep
+their indentation. Anything beyond indentation (wrapping, spacing inside a line) is not done.
+
 ### Find Usages and Rename
 
 Shift+F6 and Alt+F7 work on: **blocks** (the topmost definition along `extends` is the declaration; overrides and every
