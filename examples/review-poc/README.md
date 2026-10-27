@@ -20,6 +20,17 @@ cargo test     # 23 tests through Rocket's local client
 | `/requests/<id>` | details, history timeline, review form (reject needs a comment) or the recorded decision |
 | `/stats` | department and category bars, a monthly column chart, a ranked scorecard |
 
+## Rust side
+
+```
+src/main.rs         wiring only: manage state, mount controller::routes()
+src/controller/     one module per area: dashboard, requests, submit, detail, stats, errors
+src/forms.rs        input forms and validation
+src/view.rs         the page shell every template receives (user, flash, active nav)
+src/templates.rs    the Tera 2 engine
+src/store.rs        in-memory data and statistics
+```
+
 ## The layout is four levels deep
 
 ```
@@ -36,7 +47,7 @@ Each layer stamps `data-layer="…"`, and a test asserts all four appear in that
 | Measure | Value |
 |---------|-------|
 | Template lines, all 11 files | 461 |
-| Rust lines (`main.rs` + `store.rs`) | 307 + 187 |
+| Rust lines (app, without tests): controllers 240, forms/view/templates 136, store 187, `main.rs` 29 | 592 |
 | Components defined once (`components.html.tera`) | 11 (`ui.*`, `form.*`) |
 | Component call sites across the pages | 50 |
 | Layout levels / `{% block %}` tags | 4 / 30 |
