@@ -20,6 +20,8 @@ data class TeraSuggestion(
     val caretInSuffix: Int = suffix.length,
     /** Offered higher (positive) or lower (negative) in the list; used to put fitting filters first. */
     val priority: Double = 0.0,
+    /** An iterable variable offered as a whole loop: selecting it replaces the `{{ .. }}` with this snippet. */
+    val snippet: TeraSnippet? = null,
 )
 
 /** Context analysis for completion; pure text in, suggestions out. */
@@ -141,6 +143,14 @@ object TeraCompletionEngine {
         if (!snapshot.hidesContext) {
             for (v in context?.variables.orEmpty()) {
                 if (seen.add(v.name)) result.add(TeraSuggestion(v.name, ": ${v.rustType ?: v.type.display()}", "context"))
+            }
+        }
+        // `{{ categories` where `categories` is a list or map: also offer the loop that shows it properly.
+        if (block.kind == '{' && prior.isEmpty()) {
+            val iterable = snapshot.bindings.map { it.name to it.type } +
+                (if (snapshot.hidesContext) emptyList() else context?.variables.orEmpty().map { it.name to it.type })
+            for ((name, type) in iterable.distinctBy { it.first }) {
+                for (snip in TeraIterate.snippets(name, type)) result.add(TeraSuggestion(name, "", "", priority = -1.0, snippet = snip))
             }
         }
         TeraBuiltins.defs("function", custom, version).forEach { result.add(builtinSuggestion(it, "function", alwaysParens = true)) }
@@ -321,6 +331,26 @@ class TeraCompletionContributor : CompletionContributor() {
                     components = TeraComponents.visible(file.project, vFile, file.text),
                 )
                 for (s in suggestions) {
+                    s.snippet?.let { snip ->
+                        val loop = LookupElementBuilder.create(snip, s.text).withPresentableText(snip.title)
+                            .withIcon(com.intellij.icons.AllIcons.Actions.Play_forward)
+                            .withTypeText(if (snip.kind == TeraSnippetKind.JOIN) "join" else "loop", true)
+                            .withInsertHandler { ctx, _ ->
+                                // Replace the whole `{{ .. }}` the name was typed in, not just the typed name.
+                                val doc = ctx.document
+                                val text = doc.charsSequence
+                                val start = text.lastIndexOf("{{", ctx.startOffset)
+                                var end = ctx.tailOffset
+                                while (end < text.length && text[end] == ' ') end++
+                                end = if (text.startsWith("}}", end)) end + 2 else ctx.tailOffset
+                                if (start >= 0) {
+                                    doc.replaceString(start, end, snip.text)
+                                    ctx.editor.caretModel.moveToOffset(start + snip.caret)
+                                }
+                            }
+                        result.addElement(com.intellij.codeInsight.completion.PrioritizedLookupElement.withPriority(loop, s.priority))
+                        return@let
+                    } ?: run {
                     var item = LookupElementBuilder.create(s.text)
                     if (s.tail.isNotEmpty()) item = item.withTailText(displayTail(s.tail), true)
                     if (s.type.isNotEmpty()) item = item.withTypeText(s.type, true)
@@ -339,6 +369,7 @@ class TeraCompletionContributor : CompletionContributor() {
                         }
                     }
                     result.addElement(if (s.priority != 0.0) com.intellij.codeInsight.completion.PrioritizedLookupElement.withPriority(item, s.priority) else item)
+                    }
                 }
             }
         })

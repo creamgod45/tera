@@ -204,6 +204,11 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
   `Tera::new("views/..")` (also `concat!(env!("CARGO_MANIFEST_DIR"), ..)`), `relative!(..)`, and a changed working
   directory (`std::env::set_current_dir("site")`, Rust's `chdir`), tried before the crate directory; each crate of a
   workspace keeps its own.
+- **Lists and maps that are printed as they are.** `{{ categories }}` shows `["Travel", "Equipment"]`; when the Rust type
+  is an array, `Vec`, slice or map, completion on `{{ cate|` also offers *for category in categories* (with the field
+  of the element for records) and, for lists of plain values, *categories | join(sep=", ")*; Alt+Enter on the variable
+  offers the same as *Tera: for …*, *for … else (when empty)* and *join*. The loop variable is named from the list
+  (`categories` → `category`).
 - **Template paths while typing.** Inside the string of a call, `show("pa|")` offers the project's templates, written
   the way the project already writes them (`pages/detail.html` if its strings carry the extension, Rocket's
   `pages/detail` otherwise). A `const PAGE: &str = "pages/x";` passed to the call counts as the path too.

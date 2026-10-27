@@ -346,6 +346,13 @@ class TeraContextTest : BasePlatformTestCase() {
         myFixture.configureFromExistingVirtualFile(file2.virtualFile)
         myFixture.editor.caretModel.moveToOffset(file2.text.indexOf(" }}"))
         myFixture.completeBasic()
+        // `tasks` is a list, so the loops over it are offered beside the variable: pick the variable itself.
+        val items = myFixture.lookupElements
+        if (items != null) {
+            assertTrue(items.map { it.lookupString }.toString(), items.count { it.lookupString == "tasks" } >= 2)
+            myFixture.lookup.currentItem = items.first { it.`object` !is TeraSnippet && it.lookupString == "tasks" }
+            myFixture.finishLookup('\n')
+        }
         assertTrue(myFixture.editor.document.text.contains("tasks"))
     }
 

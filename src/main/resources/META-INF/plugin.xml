@@ -147,6 +147,23 @@
             <category>Tera</category>
         </intentionAction>
 
+        <!-- Alt+Enter on {{ list }}: loop over it / loop with a fallback / join it -->
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraIterateForIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraIterateForElseIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraIterateJoinIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+
         <!-- Tera version (auto-detected from Cargo, overridable) -->
         <projectService serviceImplementation="com.tera.tera.TeraSettings"/>
         <projectConfigurable parentId="language" instance="com.tera.tera.TeraSettingsConfigurable"
