@@ -132,6 +132,19 @@
         <completion.contributor language="Rust"
                                 implementationClass="com.tera.tera.TeraRustTemplateCompletionContributor"/>
 
+        <!-- Editor basics: Cmd+/ comment, brace matching, auto-close, folding -->
+        <lang.commenter language="Tera" implementationClass="com.tera.tera.TeraCommenter"/>
+        <lang.braceMatcher language="Tera" implementationClass="com.tera.tera.TeraBraceMatcher"/>
+        <typedHandler implementation="com.tera.tera.TeraTypedHandler"/>
+        <backspaceHandlerDelegate implementation="com.tera.tera.TeraBackspaceHandler"/>
+        <lang.foldingBuilder language="Tera" implementationClass="com.tera.tera.TeraFoldingBuilder"/>
+
+        <!-- Live templates (Tab): common ones, and the ones for Tera 1 or Tera 2 only -->
+        <liveTemplateContext contextId="TERA" implementation="com.tera.tera.TeraTemplateContext"/>
+        <liveTemplateContext contextId="TERA_V1" baseContextId="TERA" implementation="com.tera.tera.TeraV1TemplateContext"/>
+        <liveTemplateContext contextId="TERA_V2" baseContextId="TERA" implementation="com.tera.tera.TeraV2TemplateContext"/>
+        <defaultLiveTemplates file="liveTemplates/Tera"/>
+
         <!-- Gutter: usages of a component on its definition, the definition on a call -->
         <codeInsight.lineMarkerProvider language="Tera"
                                         implementationClass="com.tera.tera.TeraComponentLineMarkerProvider"/>

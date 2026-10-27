@@ -193,6 +193,15 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
   take `Kwargs` and `&State`, everything must be registered before the templates are added, and Rocket's
   `rocket_dyn_templates` does not use Tera 2 yet.
 
+### Editor basics
+
+Cmd+/ comments with `{# #}`; `{{ }}`, `{% %}` and `{# #}` pair up; typing `{{`, `{%` or `{#` completes the pair and puts
+the caret inside (Backspace removes an empty pair); `block`, `for`, `if`, `macro`, `component`, `filter`, `raw` and a
+capturing `set` fold down to their end tag; and live templates (type the abbreviation, Tab) cover the usual tags:
+`xx`, `block`, `inblock`, `if`, `ifi`, `ifelse`, `elif`, `else`, `forloop`, `forkv`, `forelse`, `extend`, `include`,
+`filter`, `raw`, `comment`, `super`, `set`, `setglobal`; `macro` and `import` only in Tera 1 projects; `component`,
+`comp`, `compbody`, `setblock`, `ternary`, `comprehension`, `break`, `continue` only in Tera 2 projects.
+
 ### Usages and render contexts
 
 - **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and
