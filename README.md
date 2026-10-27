@@ -193,6 +193,13 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
   take `Kwargs` and `&State`, everything must be registered before the templates are added, and Rocket's
   `rocket_dyn_templates` does not use Tera 2 yet.
 
+## Example: a request, review and statistics app
+
+`examples/review-poc` is a Rocket + Tera 2 application with a four-level layout, an eleven-component library and a
+validated form with a review flow and statistics pages. `cargo test` (23 tests) checks the behaviour, and
+`TeraReviewPocExampleTest` checks that the plugin reports no error or warning in its templates. See its README for the
+numbers.
+
 ## Build and test
 
 Use JDK 21 and the included Gradle wrapper:

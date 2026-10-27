@@ -1,0 +1,27 @@
+{% extends "layouts/section.html" %}
+
+{% block heading %}Submit an expense request{% endblock heading %}
+{% block subtitle %}A reviewer decides within two working days.{% endblock subtitle %}
+
+{% block content %}
+<form method="post" action="/requests" class="mx-auto max-w-3xl" data-layer="page" data-page="new">
+  {% <ui.card title="Request details" subtitle="All fields marked * are required"> %}
+    <div class="grid gap-5 sm:grid-cols-2">
+      {{ <form.field name="applicant" label="Your name" placeholder="Ada Lovelace"/> }}
+      {{ <form.field name="email" label="Work email" kind="email" placeholder="ada@example.com"/> }}
+      {{ <form.select name="department" label="Department" options={departments}/> }}
+      {{ <form.select name="category" label="Category" options={categories}/> }}
+      {{ <form.field name="amount" label="Amount (USD)" kind="number" placeholder="120" hint="Between 1 and 50000"/> }}
+      {{ <form.field name="date" label="Expense date" kind="date" fallback={today}/> }}
+    </div>
+    <div class="mt-5 space-y-5">
+      {{ <form.textarea name="reason" label="Reason" rows={4} placeholder="What was it for? At least 10 characters."/> }}
+      {{ <form.checkbox name="urgent" label="Urgent" hint="Moves the request to the top of the reviewer's list"/> }}
+    </div>
+    <div class="mt-6 flex justify-end gap-3">
+      {{ <ui.button label="Cancel" href="/requests" kind="ghost"/> }}
+      {{ <ui.button label="Submit request" type="submit"/> }}
+    </div>
+  {% </ui.card> %}
+</form>
+{% endblock content %}

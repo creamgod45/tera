@@ -1,0 +1,16 @@
+{# Layer 3: a titled section: heading, subtitle, action buttons, then the page's content. #}
+{% extends "layouts/app.html" %}
+
+{% block main %}
+<section class="mx-auto max-w-6xl" data-layer="section">
+  <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">{% block eyebrow %}ExpenseFlow{% endblock eyebrow %}</p>
+      <h1 class="text-2xl font-bold tracking-tight">{% block heading %}{{ title }}{% endblock heading %}</h1>
+      <p class="mt-1 text-sm text-slate-500">{% block subtitle %}{% endblock subtitle %}</p>
+    </div>
+    <div class="flex items-center gap-3" data-slot="actions">{% block actions %}{% endblock actions %}</div>
+  </div>
+  {% block content %}{% endblock content %}
+</section>
+{% endblock main %}

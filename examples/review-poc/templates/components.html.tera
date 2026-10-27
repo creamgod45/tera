@@ -1,0 +1,116 @@
+{# The component library: every piece of interface the pages use. Components are global in Tera 2, nothing to import. #}
+
+{# A sidebar link; `active` highlights it. #}
+{% component ui.nav_item(href: string, label: string, active: bool = false) %}
+<a href="{{ href }}" data-nav="{{ label | lower }}"
+   class="flex items-center rounded-lg px-3 py-2 text-sm font-medium {{ 'bg-indigo-50 text-indigo-700' if active else 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' }}">{{ label }}</a>
+{% endcomponent ui.nav_item %}
+
+{# A white panel with an optional title; the content is the body. #}
+{% component ui.card(title: string = "", subtitle: string = "") %}
+<div class="rounded-xl border border-slate-200 bg-white shadow-sm" data-ui="card">
+  {% if title %}
+  <div class="border-b border-slate-100 px-5 py-4">
+    <h2 class="text-base font-semibold">{{ title }}</h2>
+    {% if subtitle %}<p class="text-sm text-slate-500">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% endif %}
+  <div class="p-5">{{ body }}</div>
+</div>
+{% endcomponent ui.card %}
+
+{# pending / approved / rejected as a coloured pill. #}
+{% component ui.badge(status: string) %}
+{% set tone = {
+  "pending": "bg-amber-50 text-amber-700 ring-amber-200",
+  "approved": "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  "rejected": "bg-rose-50 text-rose-700 ring-rose-200"
+} %}
+<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ tone[status] | default(value="bg-slate-50 text-slate-700 ring-slate-200") }}" data-status="{{ status }}">{{ status | capitalize }}</span>
+{% endcomponent ui.badge %}
+
+{# A figure with a caption. `value` can be a number or a string. #}
+{% component ui.stat(label: string, value, hint: string = "", tone: string = "slate") %}
+{% set colour = {"slate": "text-slate-900", "amber": "text-amber-600", "emerald": "text-emerald-600", "rose": "text-rose-600", "indigo": "text-indigo-600"} %}
+<div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" data-ui="stat" data-stat="{{ label | lower }}">
+  <p class="text-sm font-medium text-slate-500">{{ label }}</p>
+  <p class="mt-2 text-3xl font-bold tracking-tight {{ colour[tone] }}">{{ value }}</p>
+  {% if hint %}<p class="mt-1 text-xs text-slate-400">{{ hint }}</p>{% endif %}
+</div>
+{% endcomponent ui.stat %}
+
+{# A link or a button. With `href` it is an anchor, otherwise a <button> (use type="submit" in forms). #}
+{% component ui.button(label: string, href: string = "", kind: string = "primary", type: string = "button", name: string = "", value: string = "") %}
+{% set look = {
+  "primary": "bg-indigo-600 text-white hover:bg-indigo-500",
+  "success": "bg-emerald-600 text-white hover:bg-emerald-500",
+  "danger": "bg-rose-600 text-white hover:bg-rose-500",
+  "ghost": "bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+} %}
+{% if href %}
+<a href="{{ href }}" class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm {{ look[kind] }}">{{ label }}</a>
+{% else %}
+<button type="{{ type }}" {% if name %}name="{{ name }}" value="{{ value }}"{% endif %} class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm {{ look[kind] }}">{{ label }}</button>
+{% endif %}
+{% endcomponent ui.button %}
+
+{# A horizontal bar: `value` out of `max`, as a percentage of the track. #}
+{% component ui.bar(label: string, value: integer, max: integer, tone: string = "indigo", note: string = "") %}
+{% set fill = {"indigo": "bg-indigo-500", "emerald": "bg-emerald-500", "amber": "bg-amber-500", "rose": "bg-rose-500"} %}
+{% set pct = (value * 100 // max) if max > 0 else 0 %}
+<div data-ui="bar" data-bar="{{ label | lower }}" data-pct="{{ pct }}">
+  <div class="mb-1 flex justify-between text-sm"><span class="font-medium">{{ label }}</span><span class="text-slate-500">{{ note }}</span></div>
+  <div class="h-2.5 rounded-full bg-slate-100"><div class="h-2.5 rounded-full {{ fill[tone] }}" style="width: {{ pct }}%"></div></div>
+</div>
+{% endcomponent ui.bar %}
+
+{# What to show instead of an empty table. #}
+{% component ui.empty(message: string) %}
+<div class="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500" data-ui="empty">{{ message }}</div>
+{% endcomponent ui.empty %}
+
+{# ── Form controls. `@errors` and `@values` are the form context of the page: the controls read them themselves. ── #}
+
+{% component form.field(name: string, label: string, kind: string = "text", placeholder: string = "", hint: string = "", fallback: string = "", required: bool = true, @errors, @values) %}
+{% set shown = (values?[name]?[0] | default(value="")) or fallback %}
+{% set bad = name in errors %}
+<div class="space-y-1" data-field="{{ name }}">
+  <label for="{{ name }}" class="block text-sm font-medium text-slate-700">{{ label }}{% if required %}<span class="text-rose-500"> *</span>{% endif %}</label>
+  <input type="{{ kind }}" id="{{ name }}" name="{{ name }}" value="{{ shown }}" placeholder="{{ placeholder }}"
+         class="block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 {{ 'border-rose-400 bg-rose-50' if bad else 'border-slate-300' }}">
+  {% if hint and not bad %}<p class="text-xs text-slate-400">{{ hint }}</p>{% endif %}
+  {% if bad %}{% for e in errors[name] %}<p class="text-sm text-rose-600" data-error="{{ name }}">{{ e.msg }}</p>{% endfor %}{% endif %}
+</div>
+{% endcomponent form.field %}
+
+{% component form.select(name: string, label: string, options: array, placeholder: string = "Select…", required: bool = true, @errors, @values) %}
+{% set current = values?[name]?[0] | default(value="") %}
+{% set bad = name in errors %}
+<div class="space-y-1" data-field="{{ name }}">
+  <label for="{{ name }}" class="block text-sm font-medium text-slate-700">{{ label }}{% if required %}<span class="text-rose-500"> *</span>{% endif %}</label>
+  <select id="{{ name }}" name="{{ name }}" class="block w-full rounded-lg border bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 {{ 'border-rose-400 bg-rose-50' if bad else 'border-slate-300' }}">
+    <option value="">{{ placeholder }}</option>
+    {% for o in options %}<option value="{{ o }}" {% if o == current %}selected{% endif %}>{{ o }}</option>{% endfor %}
+  </select>
+  {% if bad %}{% for e in errors[name] %}<p class="text-sm text-rose-600" data-error="{{ name }}">{{ e.msg }}</p>{% endfor %}{% endif %}
+</div>
+{% endcomponent form.select %}
+
+{% component form.textarea(name: string, label: string, rows: integer = 4, placeholder: string = "", required: bool = true, @errors, @values) %}
+{% set shown = values?[name]?[0] | default(value="") %}
+{% set bad = name in errors %}
+<div class="space-y-1" data-field="{{ name }}">
+  <label for="{{ name }}" class="block text-sm font-medium text-slate-700">{{ label }}{% if required %}<span class="text-rose-500"> *</span>{% endif %}</label>
+  <textarea id="{{ name }}" name="{{ name }}" rows="{{ rows }}" placeholder="{{ placeholder }}"
+            class="block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 {{ 'border-rose-400 bg-rose-50' if bad else 'border-slate-300' }}">{{ shown }}</textarea>
+  {% if bad %}{% for e in errors[name] %}<p class="text-sm text-rose-600" data-error="{{ name }}">{{ e.msg }}</p>{% endfor %}{% endif %}
+</div>
+{% endcomponent form.textarea %}
+
+{% component form.checkbox(name: string, label: string, hint: string = "", @values) %}
+{% set ticked = (values?[name]?[0] | default(value="")) == "on" %}
+<label class="flex items-start gap-3" data-field="{{ name }}">
+  <input type="checkbox" name="{{ name }}" {% if ticked %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600">
+  <span><span class="block text-sm font-medium text-slate-700">{{ label }}</span>{% if hint %}<span class="block text-xs text-slate-400">{{ hint }}</span>{% endif %}</span>
+</label>
+{% endcomponent form.checkbox %}

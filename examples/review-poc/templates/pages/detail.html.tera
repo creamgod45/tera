@@ -1,0 +1,63 @@
+{% extends "layouts/section.html" %}
+
+{% block eyebrow %}Request #{{ request.id }}{% endblock eyebrow %}
+{% block heading %}{{ request.applicant }}: {{ request.category | lower }}{% endblock heading %}
+{% block subtitle %}{{ request.department }} · submitted {{ request.submitted_at }}{% endblock subtitle %}
+{% block actions %}{{ <ui.badge status={request.status}/> }}{{ <ui.button label="Back" href="/requests" kind="ghost"/> }}{% endblock actions %}
+
+{% block content %}
+<div class="grid gap-6 lg:grid-cols-3" data-layer="page" data-page="detail">
+  <div class="space-y-6 lg:col-span-2">
+    {% <ui.card title="Details"> %}
+      <dl class="grid grid-cols-2 gap-x-6 gap-y-4 text-sm" data-slot="details">
+        <div><dt class="text-slate-500">Amount</dt><dd class="text-xl font-bold">${{ request.amount }}</dd></div>
+        <div><dt class="text-slate-500">Expense date</dt><dd class="font-medium">{{ request.date }}</dd></div>
+        <div><dt class="text-slate-500">Email</dt><dd class="font-medium">{{ request.email }}</dd></div>
+        <div><dt class="text-slate-500">Priority</dt><dd class="font-medium">{{ "Urgent" if request.urgent else "Normal" }}</dd></div>
+        <div class="col-span-2"><dt class="text-slate-500">Reason</dt><dd class="mt-1 whitespace-pre-line">{{ request.reason }}</dd></div>
+      </dl>
+    {% </ui.card> %}
+
+    {% <ui.card title="History"> %}
+      {% set steps = [{"title": "Submitted", "who": request.applicant, "when": request.submitted_at, "note": request.reason}] %}
+      {% if request.review %}
+        {% set steps = [...steps, {"title": request.review.decision | capitalize, "who": request.review.reviewer, "when": request.review.at, "note": request.review.comment}] %}
+      {% endif %}
+      <ol class="space-y-5 border-l border-slate-200 pl-5" data-list="history">
+        {% for s in steps %}
+        <li class="relative">
+          <span class="absolute -left-[26px] top-1 h-3 w-3 rounded-full {{ 'bg-indigo-500' if loop.first else 'bg-emerald-500' }}"></span>
+          <p class="text-sm font-semibold">{{ s.title }} <span class="font-normal text-slate-400">by {{ s.who }} · {{ s.when }}</span></p>
+          <p class="text-sm text-slate-600">{{ s.note | truncate(length=120) }}</p>
+        </li>
+        {% endfor %}
+      </ol>
+    {% </ui.card> %}
+  </div>
+
+  <div>
+    {% if request.status == "pending" %}
+    <form method="post" action="/requests/{{ request.id }}/review">
+      {% <ui.card title="Your decision" subtitle="Approving needs no comment, rejecting does"> %}
+        <div class="space-y-4" data-slot="review">
+          {{ <form.textarea name="comment" label="Comment" rows={4} required={false} placeholder="Why?"/> }}
+          {% if "decision" in errors %}{% for e in errors["decision"] %}<p class="text-sm text-rose-600">{{ e.msg }}</p>{% endfor %}{% endif %}
+          <div class="flex gap-3">
+            {{ <ui.button label="Approve" type="submit" name="decision" value="approve" kind="success"/> }}
+            {{ <ui.button label="Reject" type="submit" name="decision" value="reject" kind="danger"/> }}
+          </div>
+        </div>
+      {% </ui.card> %}
+    </form>
+    {% else %}
+    {% <ui.card title="Decision"> %}
+      <div class="space-y-2 text-sm" data-slot="decision">
+        {{ <ui.badge status={request.status}/> }}
+        <p>by <span class="font-medium">{{ request.review?.reviewer }}</span> on {{ request.review?.at }}</p>
+        <p class="text-slate-600">{{ request.review?.comment }}</p>
+      </div>
+    {% </ui.card> %}
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,4 @@
+{% extends "layouts/section.html" %}
+{% block heading %}Page not found{% endblock heading %}
+{% block subtitle %}Nothing lives at {{ path }}{% endblock subtitle %}
+{% block content %}<div data-layer="page" data-page="not-found">{{ <ui.empty message="Check the address, or go back to the dashboard."/> }}</div>{% endblock content %}

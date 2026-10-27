@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ title }}{% endblock title %} · ExpenseFlow</title>
+  {# Tailwind's play CDN: no build step for the PoC. #}
+  <script src="https://cdn.tailwindcss.com"></script>
+  {% block head %}{% endblock head %}
+</head>
+<body class="h-full text-slate-900 antialiased" data-layer="base">
+  {% block body %}{% endblock body %}
+</body>
+</html>
