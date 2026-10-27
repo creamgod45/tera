@@ -193,6 +193,16 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
   take `Kwargs` and `&State`, everything must be registered before the templates are added, and Rocket's
   `rocket_dyn_templates` does not use Tera 2 yet.
 
+### Usages and render contexts
+
+- **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and
+  opens a list of the call sites; Cmd+click on the definition's name lists them too. Calls get a gutter icon back to the
+  definition.
+- **Variables of layouts and pages.** The Rust side is read from `Template::render("x", ctx)` and from your own
+  engine wrapper (`tpl.render("pages/detail.html", &ctx)`), through a generic page shell such as `Page<T>` with
+  `#[serde(flatten)]`, through `let ctx = page(..)`, and through Rocket's `form::Context` (`errors`, `values`, ...).
+  Layouts and partials are never rendered directly, so they get the variables of every page that extends or includes them.
+
 ## Example: a request, review and statistics app
 
 `examples/review-poc` is a Rocket + Tera 2 application with a four-level layout, an eleven-component library and a

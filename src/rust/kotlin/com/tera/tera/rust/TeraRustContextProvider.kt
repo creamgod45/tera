@@ -63,11 +63,11 @@ import org.rust.lang.core.types.type
  */
 class TeraRustContextProvider : TeraContextProvider {
 
-    private class Site(val file: VirtualFile, val call: RsCallExpr, val arg: RsExpr?, val line: Int)
+    private class Site(val file: VirtualFile, val arg: RsExpr?, val line: Int)
 
     override fun resolve(project: Project, template: VirtualFile): TeraContextResult? {
         if (DumbService.isDumb(project)) return null
-        val sites = renderSites(project, templateName(template))
+        val sites = renderSites(project, templateNames(template))
         if (sites.isEmpty()) return null
         val vars = linkedMapOf<String, TeraField>()
         var complete = true
@@ -99,8 +99,20 @@ class TeraRustContextProvider : TeraContextProvider {
         return if (found) (parts + base).joinToString("/") else base
     }
 
-    private fun renderSites(project: Project, name: String): List<Site> {
-        val pattern = Regex("""\bTemplate\s*::\s*render\s*\(\s*"${Regex.escape(name)}"\s*,""")
+    /**
+     * Every string a render call can name the template by: Rocket's `pages/detail` and, for engines that keep the
+     * extension (a hand-made `Tera::add_raw_templates`), `pages/detail.html`.
+     */
+    internal fun templateNames(template: VirtualFile): Set<String> {
+        val bare = templateName(template)
+        val rel = bare.substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" } + template.name.removeSuffix(".tera")
+        return linkedSetOf(bare, rel)
+    }
+
+    private fun renderSites(project: Project, names: Set<String>): List<Site> {
+        val any = names.joinToString("|") { Regex.escape(it) }
+        // `Template::render("x", ctx)` (Rocket), and a `render("x", ctx)` method of the app's own engine wrapper.
+        val pattern = Regex("""(?:\bTemplate\s*::\s*render|\.\s*render)\s*\(\s*"(?:$any)"\s*,""")
         val result = mutableListOf<Site>()
         val files = TeraFiles.projectFiles(project, "rs")
         for (vf in files) {
@@ -110,10 +122,16 @@ class TeraRustContextProvider : TeraContextProvider {
             if (matches.isEmpty()) continue
             val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
             for (m in matches) {
-                val leaf = psi.findElementAt(m.range.first) ?: continue
-                val call = PsiTreeUtil.getParentOfType(leaf, RsCallExpr::class.java, false) ?: continue
+                val leaf = psi.findElementAt(m.range.first + m.value.indexOf("render")) ?: continue
                 val line = text.substring(0, m.range.first).count { it == '\n' } + 1
-                result.add(Site(vf, call, call.valueArgumentList.exprList.getOrNull(1), line))
+                val method = PsiTreeUtil.getParentOfType(leaf, RsMethodCall::class.java, false)
+                val call = PsiTreeUtil.getParentOfType(leaf, RsCallExpr::class.java, false)
+                val args = when {
+                    method != null && (call == null || PsiTreeUtil.isAncestor(call, method, true)) -> method.valueArgumentList.exprList
+                    call != null -> call.valueArgumentList.exprList
+                    else -> continue
+                }
+                result.add(Site(vf, args.getOrNull(1), line))
             }
         }
         return result
@@ -123,7 +141,7 @@ class TeraRustContextProvider : TeraContextProvider {
 /** What one render call provides. [complete] is false when parts of the context could not be understood. */
 internal class RustContext(val fields: List<TeraField>, val complete: Boolean) {
     companion object {
-        fun of(arg: RsExpr): RustContext? {
+        fun of(arg: RsExpr, depth: Int = 0): RustContext? {
             var e: RsExpr = arg
             while (true) {
                 e = when {
@@ -134,12 +152,28 @@ internal class RustContext(val fields: List<TeraField>, val complete: Boolean) {
             }
             if (e is RsMacroExpr && e.macroCall.path?.referenceName == "context") return fromMacro(e.macroCall)
 
+            // `let ctx = page(..); render("x", &ctx)`: read what the variable was built from.
+            if (depth < 3) localInitializer(e)?.let { init -> of(init, depth + 1)?.let { return it } }
+
             val viaTypes = RustTypes.struct(RustTypes.typeOf(e))
             if (viaTypes != null) return RustContext(viaTypes.fields, viaTypes.exact)
             // Type inference can fail (missing std, unresolved attributes): fall back to the written path.
             val viaPath = RustTypes.struct(structFromExpression(e))
             if (viaPath != null) return RustContext(viaPath.fields, viaPath.exact)
+            // `page(title, data)` returning a generic shell such as `Page<T>`, when the call itself is not inferred.
+            val viaCall = (e as? RsCallExpr)?.let { RustTypes.viaFunction(it) }
+            if (viaCall != null) return RustContext(viaCall.fields, viaCall.exact)
             return null
+        }
+
+        /** The initializer of the `let` that declares the local variable [e] names, if it is a plain variable. */
+        private fun localInitializer(e: RsExpr): RsExpr? {
+            val name = ((e as? RsPathExpr)?.path)?.takeIf { it.path == null }?.referenceName ?: return null
+            val fn = PsiTreeUtil.getParentOfType(e, RsFunction::class.java) ?: return null
+            return PsiTreeUtil.findChildrenOfType(fn, RsLetDecl::class.java)
+                .filter { it.textRange.endOffset <= e.textRange.startOffset }
+                .lastOrNull { decl -> PsiTreeUtil.findChildrenOfType(decl.pat, RsPatBinding::class.java).any { it.name == name } }
+                ?.expr
         }
 
         /** `Type { .. }` or `Type::function(..)[.await]`, resolved from the path alone. */
@@ -265,10 +299,81 @@ internal object RustTypes {
     fun typeOf(e: RsExpr): Ty? = try { e.type } catch (ex: ProcessCanceledException) { throw ex } catch (ex: Exception) { null }
 
     fun struct(ty: Ty?): StructInfo? = unwrap(ty)?.let { adt ->
+        if (isFormContext(adt)) return StructInfo(FORM_CONTEXT, true)
         val item = adt.item as? RsStructItem ?: return null
         if (!inProject(item)) return null
-        structOf(item, 0, emptySet())
+        structOf(item, 0, emptySet(), substitutionsOf(adt))
     }
+
+    /**
+     * What a call to a project function returning a struct produces, from the function's written signature: the
+     * generic parameters of the struct (`Page<'a, T>`) are bound to the types of the arguments passed for them.
+     */
+    fun viaFunction(call: RsCallExpr): StructInfo? {
+        val path = (call.expr as? RsPathExpr)?.path ?: return null
+        val name = path.referenceName ?: return null
+        val fn = (path.reference?.resolve() as? RsFunction) ?: functionByName(call, name) ?: return null
+        val ret = fn.retType?.typeReference as? RsPathType ?: return null
+        val retName = ret.path.referenceName ?: return null
+        val item = ((ret.path.reference?.resolve() as? RsStructItem) ?: structByName(ret, retName))?.takeIf { inProject(it) } ?: return null
+        val generics = fn.typeParameterList?.typeParameterList.orEmpty().mapNotNull { it.name }
+        val args = call.valueArgumentList.exprList
+        val bound = mutableMapOf<String, TeraType>()
+        fn.valueParameterList?.valueParameterList.orEmpty().forEachIndexed { i, p ->
+            val written = p.typeReference?.text?.trim()
+            if (written in generics) args.getOrNull(i)?.let { bound[written!!] = typeOfArgument(it) }
+        }
+        val typeArgs = ret.path.typeArgumentList?.typeReferenceList.orEmpty()
+        val params = item.typeParameterList?.typeParameterList.orEmpty().mapNotNull { it.name }
+        val subst = params.zip(typeArgs).associate { (param, ref) -> param to (bound[ref.text.trim()] ?: fromRef(ref, 0, emptySet())) }
+        return structOf(item, 0, emptySet(), subst)
+    }
+
+    private fun typeOfArgument(arg: RsExpr): TeraType {
+        var e: RsExpr = arg
+        while (true) e = when { e is RsUnaryExpr && e.and != null -> e.expr ?: break; e is RsParenExpr -> e.expr ?: break; else -> break }
+        if (e is RsStructLiteral) {
+            val item = (e.path.reference?.resolve() as? RsStructItem) ?: e.path.referenceName?.let { structByName(e, it) }
+            return item?.let { structType(it, 0, emptySet()) } ?: TeraType.Unknown
+        }
+        val inferred = toTera(typeOf(e), 0, emptySet())
+        return if (inferred != TeraType.Unknown) inferred else guess(e.text, e)
+    }
+
+    private fun functionByName(context: PsiElement, name: String): RsFunction? {
+        val pattern = Regex("""\bfn\s+${Regex.escape(name)}\b""")
+        for (vf in (listOfNotNull(context.containingFile?.virtualFile) + TeraFiles.projectFiles(context.project, "rs")).distinct()) {
+            if ("/target/" in vf.path) continue
+            val m = pattern.find(TeraFiles.textOf(vf)) ?: continue
+            val psi = PsiManager.getInstance(context.project).findFile(vf) ?: continue
+            val leaf = psi.findElementAt(m.range.last) ?: continue
+            PsiTreeUtil.getParentOfType(leaf, RsFunction::class.java, false)?.takeIf { it.name == name }?.let { return it }
+        }
+        return null
+    }
+
+    /** `struct Page<'a, T>` seen as `Page<'_, DetailData>`: the type parameter names mapped to what they stand for. */
+    private fun substitutionsOf(ty: TyAdt): Map<String, TeraType> {
+        val names = (ty.item as? RsStructItem)?.typeParameterList?.typeParameterList.orEmpty().mapNotNull { it.name }
+        return names.zip(ty.typeArguments.map { toTera(it, 1, emptySet()) }).toMap()
+    }
+
+    /** Rocket's `rocket::form::Context`, which serializes as a map and is what a form template reads. */
+    private fun isFormContext(ty: TyAdt): Boolean =
+        ty.item.name == "Context" && ty.item.containingFile?.virtualFile?.path?.let { "/form/" in it || "rocket" in it } == true &&
+            !inProject(ty.item)
+
+    private fun formContext(): TeraType = TeraType.Struct("Context", FORM_CONTEXT)
+
+    /** The serialized fields of `rocket::form::Context` (its `status` is skipped by serde). */
+    private val FORM_CONTEXT: List<TeraField> = listOf(
+        TeraField("errors", TeraType.MapOf(TeraType.ArrayOf(TeraType.Unknown)), "IndexMap<NameBuf, Errors>",
+            "Errors of each field, by field name; every error has `msg`, `name`, `value`."),
+        TeraField("values", TeraType.MapOf(TeraType.ArrayOf(TeraType.Scalar("string"))), "IndexMap<&Name, Vec<&str>>",
+            "What was submitted for each field, by field name."),
+        TeraField("data_fields", TeraType.ArrayOf(TeraType.Scalar("string")), "IndexSet<&Name>", "Names of the submitted data fields."),
+        TeraField("form_errors", TeraType.ArrayOf(TeraType.Unknown), "Errors", "Errors that belong to the form, not a field."),
+    )
 
     fun struct(ref: StructItemRef?): StructInfo? =
         (ref?.item as? RsStructItem)?.takeIf { inProject(it) }?.let { structOf(it, 0, emptySet()) }
@@ -306,15 +411,16 @@ internal object RustTypes {
             name in WRAPPERS -> toTera(args.firstOrNull(), depth, seen)
             name in ARRAYS -> TeraType.ArrayOf(toTera(args.firstOrNull(), depth + 1, seen))
             name in MAPS -> TeraType.MapOf(toTera(args.getOrNull(1), depth + 1, seen))
-            else -> (ty.item as? RsStructItem)?.let { structType(it, depth, seen) } ?: TeraType.Unknown
+            isFormContext(ty) -> formContext()
+            else -> (ty.item as? RsStructItem)?.let { structType(it, depth, seen, substitutionsOf(ty)) } ?: TeraType.Unknown
         }
     }
 
     /** A struct as the template sees it; library types and cycles are not expanded. */
-    private fun structType(item: RsStructItem, depth: Int, seen: Set<PsiElement>): TeraType {
+    private fun structType(item: RsStructItem, depth: Int, seen: Set<PsiElement>, subst: Map<String, TeraType> = emptyMap()): TeraType {
         if (depth >= MAX_DEPTH || item in seen || !inProject(item)) return TeraType.Unknown
         return when {
-            item.blockFields != null -> TeraType.Struct(item.name ?: "struct", structOf(item, depth + 1, seen).fields)
+            item.blockFields != null -> TeraType.Struct(item.name ?: "struct", structOf(item, depth + 1, seen, subst).fields)
             item.tupleFields != null -> {
                 val elems = item.tupleFields!!.tupleFieldDeclList.map { fromRef(it.typeReference, depth + 1, seen + item) }
                 if (elems.size == 1) elems[0] else TeraType.Tuple(elems)
@@ -389,7 +495,7 @@ internal object RustTypes {
             name in ARRAYS -> TeraType.ArrayOf(fromRef(args.firstOrNull(), depth + 1, seen))
             name in MAPS -> TeraType.MapOf(fromRef(args.getOrNull(1), depth + 1, seen))
             else -> ((path.reference?.resolve() as? RsStructItem) ?: structByName(ref, name))
-                ?.let { structType(it, depth, seen) } ?: TeraType.Unknown
+                ?.let { structType(it, depth, seen) } ?: if (name == "Context" && ref.text.startsWith("&").not()) formContext() else TeraType.Unknown
         }
     }
 
@@ -397,7 +503,7 @@ internal object RustTypes {
         try { ref.normType } catch (ex: ProcessCanceledException) { throw ex } catch (ex: Exception) { null }
 
     /** Fields of [item] as serde would serialize them. [StructInfo.exact] is false if something was not understood. */
-    fun structOf(item: RsStructItem, depth: Int, seen: Set<PsiElement>): StructInfo {
+    fun structOf(item: RsStructItem, depth: Int, seen: Set<PsiElement>, subst: Map<String, TeraType> = emptyMap()): StructInfo {
         val rule = serdeValue(item.outerAttrList.joinToString(" ") { it.text }, "rename_all")
         val next = seen + item
         val out = mutableListOf<TeraField>()
@@ -406,7 +512,8 @@ internal object RustTypes {
             val attrs = field.outerAttrList.joinToString(" ") { it.text }.takeIf { "serde" in it }.orEmpty()
             if (Regex("""\bskip\b|\bskip_serializing\b""").containsMatchIn(attrs)) continue
             val rustName = field.identifier.text
-            val type = fromRef(field.typeReference, depth, next)
+            val written = field.typeReference?.text?.trim()
+            val type = subst[written] ?: fromRef(field.typeReference, depth, next)
             if (Regex("""\bflatten\b""").containsMatchIn(attrs)) {
                 val inner = type as? TeraType.Struct
                 if (inner != null) out.addAll(inner.fields) else exact = false

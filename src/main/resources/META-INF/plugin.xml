@@ -124,6 +124,10 @@
         <!-- 跳转到定义：宏、命名空间、参数、模板路径（多个来源时弹出列表） -->
         <gotoDeclarationHandler implementation="com.tera.tera.TeraGotoDeclarationHandler"/>
 
+        <!-- Gutter: usages of a component on its definition, the definition on a call -->
+        <codeInsight.lineMarkerProvider language="Tera"
+                                        implementationClass="com.tera.tera.TeraComponentLineMarkerProvider"/>
+
         <!-- 悬停 / Quick Documentation：宏签名、参数、说明注释 -->
         <lang.documentationProvider language="Tera"
                                     implementationClass="com.tera.tera.TeraDocumentationProvider"/>

@@ -28,6 +28,8 @@ object TeraNavigation {
         custom: List<TeraCustomBuiltin> = emptyList(),
         version: TeraVersion = TeraVersion.V1,
         components: List<TeraComponent> = emptyList(),
+        /** Where the component called [String] is used; asked when the caret is on a component's own definition. */
+        usagesOf: (String) -> List<TeraDefinition> = { emptyList() },
         templatesOf: (String) -> List<Pair<VirtualFile, List<MacroDef>>>,
     ): List<TeraDefinition> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
@@ -71,6 +73,11 @@ object TeraNavigation {
             }
         }
 
+        // On a component's own name in its definition: where it is used (the reverse of go-to-definition).
+        for (def in TeraComponentScanner.definitions(text, blocks)) {
+            if (def.nameRange.touches()) usagesOf(def.name).forEach { result.add(it) }
+        }
+
         // A component call: the component's definition, or the parameter an attribute names.
         for (call in TeraComponentScanner.calls(blocks)) {
             val targets = components.filter { it.def.name == call.name }
@@ -109,7 +116,8 @@ class TeraGotoDeclarationHandler : GotoDeclarationHandler {
         val here = file.viewProvider.getPsi(TeraLanguage) ?: return null
 
         val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file), TeraContexts.customBuiltins(file.project),
-            TeraVersions.forFile(project, vFile).version, TeraComponents.visible(project, vFile, here.text)) { path ->
+            TeraVersions.forFile(project, vFile).version, TeraComponents.visible(project, vFile, here.text),
+            { name -> TeraUsages.ofComponent(project, name).map { TeraDefinition(it.file, it.range.startOffset) } }) { path ->
             vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty()
         }
         val manager = PsiManager.getInstance(project)

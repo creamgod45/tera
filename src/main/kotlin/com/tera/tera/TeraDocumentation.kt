@@ -384,7 +384,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         val templatesOf = { path: String -> vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty() }
         val manager = PsiManager.getInstance(file.project)
         for (def in TeraNavigation.definitions(here.text, targetOffset, null, emptyList(), versionOf(file),
-            TeraComponents.visible(file.project, vFile, here.text), templatesOf)) {
+            TeraComponents.visible(file.project, vFile, here.text), templatesOf = templatesOf)) {
             if (def.offset < 0) continue
             val psi = if (def.file == null) here
             else manager.findFile(def.file)?.viewProvider?.getPsi(TeraLanguage) ?: continue
