@@ -77,6 +77,8 @@ class TeraIterateTest : BasePlatformTestCase() {
         assertNull(applyIntention("{{ ti<caret>tle }}", "for"))
         assertNull(applyIntention("{{ categories<caret> | length }}", "for"))
         assertNull(applyIntention("{{ categories<caret> | join(sep=\"-\") }}", "for"))
+        assertNull(applyIntention("{{ categories<caret> | first | upper }}", "for"))
+        assertNull(applyIntention("{{ categories<caret> ~ \"x\" }}", "for"))
         assertNull(applyIntention("{{ <caret>unknown }}", "for"))
     }
 
@@ -102,5 +104,42 @@ class TeraIterateTest : BasePlatformTestCase() {
         myFixture.configureByText("t.html.tera", "{{ title<caret> }}")
         myFixture.completeBasic()
         assertTrue(myFixture.lookupElements.isNullOrEmpty() || myFixture.lookupElements!!.none { it.lookupString == "title" && it.`object` is TeraSnippet })
+    }
+
+    // ── filter chains ───────────────────────────────────────────────────────
+
+    fun testALoopOverAFilteredList() {
+        assertEquals("{% for category in categories | sort %}{{ category }}{% endfor %}",
+            applyIntention("{{ categories<caret> | sort }}", "for category in categories | sort"))
+        assertEquals("{% for category in categories | sort | reverse %}{{ category }}{% endfor %}",
+            applyIntention("{{ categories | sort | reverse<caret> }}", "for category in"))
+    }
+
+    fun testMapsGiveListsThroughKeysAndValues() {
+        assertEquals("{% for value in counts | values %}{{ value }}{% endfor %}",
+            applyIntention("{{ counts | values<caret> }}", "for value in counts | values"))
+        assertEquals("{% for key in counts | keys %}{{ key }}{% endfor %}",
+            applyIntention("{{ counts | keys<caret> }}", "for key in counts | keys"))
+    }
+
+    fun testAnUnfinishedFilterIsIgnored() {
+        // The case from the editor: the chain ends in a `|` that has not been completed yet.
+        assertEquals("{% for value in counts | values %}{{ value }}{% endfor %}",
+            applyIntention("{{ counts | values |<caret> }}", "for value in counts | values"))
+    }
+
+    fun testAFilterThatMakesAPlainValueOffersNothing() {
+        assertNull(applyIntention("{{ categories | join(sep=\", \")<caret> }}", "for"))
+        // `values` needs a map: on a list the chain is not understood, so no loop is guessed.
+        assertNull(applyIntention("{{ categories | values<caret> }}", "for"))
+    }
+
+    fun testFilterTypes() {
+        val list = TeraType.ArrayOf(scalar("string"))
+        assertTrue(TeraIterate.afterFilter("sort", list) is TeraType.ArrayOf)
+        assertTrue(TeraIterate.afterFilter("values", TeraType.MapOf(scalar("number"))) is TeraType.ArrayOf)
+        assertEquals(TeraType.Unknown, TeraIterate.afterFilter("length", list))
+        assertEquals(TeraType.Unknown, TeraIterate.afterFilter("nonsense", list))
+        assertTrue(TeraIterate.afterFilter("group_by", list) is TeraType.MapOf)
     }
 }
