@@ -395,9 +395,11 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
 
     override fun generateDoc(element: PsiElement?, originalElement: PsiElement?): String? {
         element ?: return null
-        val file = element.containingFile
+        // Elements without a text range (a directory, a synthetic element) are not ours to document.
+        val start = element.textRange?.startOffset ?: return null
+        val file = element.containingFile ?: return null
         val text = file.text
-        return when (val d = describe(file, element.textRange.startOffset)) {
+        return when (val d = describe(file, start)) {
             is Described.Macro -> TeraDocumentation.macroHtml(text, d.macro, file.name)
             is Described.Param -> TeraDocumentation.paramHtml(text, d.macro, d.param, file.name)
             is Described.Import -> {
@@ -418,8 +420,9 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
 
     override fun getQuickNavigateInfo(element: PsiElement?, originalElement: PsiElement?): String? {
         element ?: return null
-        val file = element.containingFile
-        return when (val d = describe(file, element.textRange.startOffset)) {
+        val start = element.textRange?.startOffset ?: return null
+        val file = element.containingFile ?: return null
+        return when (val d = describe(file, start)) {
             is Described.Macro -> "${file.name}: ${TeraDocumentation.signature(d.macro)}"
             is Described.Param -> {
                 val doc = TeraDocumentation.docComment(file.text, d.macro)

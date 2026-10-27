@@ -212,4 +212,14 @@ class TeraDocumentationTest : BasePlatformTestCase() {
         assertEquals("q.html.tera: a(y: integer)", info("y=1"))
         assertEquals("import \"x\" as x", info("x %}"))
     }
+
+    /** A directory (or any element without a text range) reached the provider and crashed the documentation popup. */
+    fun testElementsWithoutATextRangeAreIgnored() {
+        myFixture.addFileToProject("templates/a.html.tera", "x")
+        val dir = myFixture.psiManager.findDirectory(myFixture.findFileInTempDir("templates"))!!
+        assertNull(dir.textRange)
+        val p = TeraDocumentationProvider()
+        assertNull(p.generateDoc(dir, null))
+        assertNull(p.getQuickNavigateInfo(dir, null))
+    }
 }
