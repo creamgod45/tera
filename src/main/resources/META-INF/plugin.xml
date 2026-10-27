@@ -145,6 +145,10 @@
         <liveTemplateContext contextId="TERA_V2" baseContextId="TERA" implementation="com.tera.tera.TeraV2TemplateContext"/>
         <defaultLiveTemplates file="liveTemplates/Tera"/>
 
+        <!-- Gutter: block overrides along the extends chain -->
+        <codeInsight.lineMarkerProvider language="Tera"
+                                        implementationClass="com.tera.tera.TeraBlockLineMarkerProvider"/>
+
         <!-- Gutter: usages of a component on its definition, the definition on a call -->
         <codeInsight.lineMarkerProvider language="Tera"
                                         implementationClass="com.tera.tera.TeraComponentLineMarkerProvider"/>

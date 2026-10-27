@@ -30,6 +30,8 @@ object TeraNavigation {
         components: List<TeraComponent> = emptyList(),
         /** Where the component called [String] is used; asked when the caret is on a component's own definition. */
         usagesOf: (String) -> List<TeraDefinition> = { emptyList() },
+        /** The parent and overriding definitions of a `{% block %}` by name. */
+        blockLinks: (String) -> TeraBlockLinks = { TeraBlockLinks.NONE },
         templatesOf: (String) -> List<Pair<VirtualFile, List<MacroDef>>>,
     ): List<TeraDefinition> {
         val blocks = TeraSymbolScanner.scanBlocks(text)
@@ -70,6 +72,18 @@ object TeraNavigation {
                             .forEach { result.add(TeraDefinition(file, it.range.startOffset)) }
                     }
                 }
+            }
+        }
+
+        // A `{% block x %}` or `{% endblock x %}` name, or `{{ super() }}`: the parent's block; for the topmost one,
+        // the blocks that override it.
+        for (block in blocks) {
+            val t = block.tokens
+            if (block.kind == '%' && t.size >= 2 && (t[0].text == "block" || t[0].text == "endblock") && t[1].range.touches()) {
+                val links = blockLinks(t[1].text)
+                (links.parents.ifEmpty { links.overriders }).forEach { result.add(it) }
+            } else if (block.kind == '{' && t.size >= 3 && t[0].text == "super" && t[0].range.touches()) {
+                TeraBlocks.enclosing(blocks, text, t[0].range.startOffset)?.let { name -> blockLinks(name).parents.forEach { result.add(it) } }
             }
         }
 
@@ -117,7 +131,8 @@ class TeraGotoDeclarationHandler : GotoDeclarationHandler {
 
         val definitions = TeraNavigation.definitions(here.text, offset, TeraContexts.forFile(file), TeraContexts.customBuiltins(file.project),
             TeraVersions.forFile(project, vFile).version, TeraComponents.visible(project, vFile, here.text),
-            { name -> TeraUsages.ofComponent(project, name).map { TeraDefinition(it.file, it.range.startOffset) } }) { path ->
+            { name -> TeraUsages.ofComponent(project, name).map { TeraDefinition(it.file, it.range.startOffset) } },
+            { name -> vFile?.let { TeraBlocks.links(project, it, name) } ?: TeraBlockLinks.NONE }) { path ->
             vFile?.let { TeraImports.templatesOf(it, path) }.orEmpty()
         }
         val manager = PsiManager.getInstance(project)

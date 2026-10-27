@@ -40,7 +40,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
 - 2.4 Tests and README (S)
 - Done when: a project with an unusual root works after adding one setting.
 
-## 3. Block navigation (M)
+## 3. Block navigation (M) — done
 
 - 3.1 Block → parent definition (M)
   - 3.1.1 Resolve the `extends` chain (several levels)

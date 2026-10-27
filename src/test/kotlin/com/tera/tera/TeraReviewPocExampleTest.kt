@@ -69,4 +69,15 @@ class TeraReviewPocExampleTest : BasePlatformTestCase() {
         assertTrue(problems("<ui.stat label=\"x\" value=\"1\" colour=\"red\"/>").isNotEmpty() || components.first { it.def.name == "ui.stat" }.def.hasRest)
         assertTrue(problems("<ui.nope/>").isNotEmpty())
     }
+
+    fun testBlocksNavigateAlongTheFourLevelLayout() {
+        TeraSettings.getInstance(project).state.version = "2"
+        for ((n, text) in templates()) myFixture.addFileToProject("review-poc/templates/$n".replace('\\', '/'), text)
+        fun f(n: String) = myFixture.findFileInTempDir("review-poc/templates/$n")
+        // pages → section → app → base
+        assertEquals(listOf("section.html.tera"), TeraBlocks.parents(f("pages/detail.html.tera"), "content").map { it.first.name })
+        assertEquals(listOf("app.html.tera"), TeraBlocks.parents(f("layouts/section.html.tera"), "main").map { it.first.name })
+        val pages = TeraBlocks.overriders(project, f("layouts/section.html.tera"), "content").map { it.first.name }
+        assertEquals(listOf("dashboard.html.tera", "detail.html.tera", "new.html.tera", "not_found.html.tera", "requests.html.tera", "stats.html.tera"), pages)
+    }
 }

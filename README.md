@@ -202,6 +202,13 @@ capturing `set` fold down to their end tag; and live templates (type the abbrevi
 `filter`, `raw`, `comment`, `super`, `set`, `setglobal`; `macro` and `import` only in Tera 1 projects; `component`,
 `comp`, `compbody`, `setblock`, `ternary`, `comprehension`, `break`, `continue` only in Tera 2 projects.
 
+### Blocks along `extends`
+
+Cmd+click on a `{% block x %}` name (or its `endblock`, or on `{{ super() }}`) goes to the block it replaces in the
+parent template, following the `extends` chain through templates that do not define it; on the topmost definition it
+lists the templates that override it. Gutter icons show *Overrides block x in base.html* and *Block x is overridden in
+N templates*.
+
 ### Usages and render contexts
 
 - **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and
