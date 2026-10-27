@@ -13,6 +13,7 @@ import com.tera.tera.BuiltinDef
 import com.tera.tera.BuiltinParam
 import com.tera.tera.TeraBuiltins
 import com.tera.tera.TeraContextProvider
+import com.tera.tera.TeraFiles
 import com.tera.tera.TeraCustomBuiltin
 import com.tera.tera.TeraContextResult
 import com.tera.tera.TeraField
@@ -101,11 +102,10 @@ class TeraRustContextProvider : TeraContextProvider {
     private fun renderSites(project: Project, name: String): List<Site> {
         val pattern = Regex("""\bTemplate\s*::\s*render\s*\(\s*"${Regex.escape(name)}"\s*,""")
         val result = mutableListOf<Site>()
-        val files = FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))
+        val files = TeraFiles.projectFiles(project, "rs")
         for (vf in files) {
             if ("/target/" in vf.path) continue
-            val text = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
-                ?: String(vf.contentsToByteArray(), vf.charset)
+            val text = TeraFiles.textOf(vf)
             val matches = pattern.findAll(text).toList()
             if (matches.isEmpty()) continue
             val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
@@ -226,11 +226,10 @@ internal object RustTypes {
         val project = context.project
         val pattern = Regex("""\bstruct\s+${Regex.escape(name)}\b""")
         val localFirst = listOfNotNull(context.containingFile?.virtualFile) +
-            FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))
+            TeraFiles.projectFiles(project, "rs")
         for (vf in localFirst.distinct()) {
             if ("/target/" in vf.path) continue
-            val text = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
-                ?: String(vf.contentsToByteArray(), vf.charset)
+            val text = TeraFiles.textOf(vf)
             val m = pattern.find(text) ?: continue
             val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
             val leaf = psi.findElementAt(m.range.last) ?: continue
@@ -246,11 +245,10 @@ internal object RustTypes {
     private fun structFromMacroExpansion(context: PsiElement, name: String): RsStructItem? {
         val project = context.project
         val files = listOfNotNull(context.containingFile?.virtualFile) +
-            FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))
+            TeraFiles.projectFiles(project, "rs")
         for (vf in files.distinct()) {
             if ("/target/" in vf.path) continue
-            val text = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
-                ?: String(vf.contentsToByteArray(), vf.charset)
+            val text = TeraFiles.textOf(vf)
             if (!Regex("""\b${Regex.escape(name)}\b""").containsMatchIn(text)) continue
             val psi = PsiManager.getInstance(project).findFile(vf) ?: continue
             for (call in PsiTreeUtil.findChildrenOfType(psi, RsMacroCall::class.java)) {
@@ -494,7 +492,7 @@ internal object RustCustomBuiltins {
 
     fun find(project: Project): List<TeraCustomBuiltin> {
         val found = linkedMapOf<Pair<String, String>, TeraCustomBuiltin>()
-        val files = FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))
+        val files = TeraFiles.projectFiles(project, "rs")
         val sources = files.filter { "/target/" !in it.path }.map { it to textOf(it) }
         val consts = Regex("""\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*&(?:\s*'static)?\s*str\s*=\s*"([^"]*)"""")
             .let { re -> sources.flatMap { (_, t) -> re.findAll(t).map { it.groupValues[1] to it.groupValues[2] }.toList() }.toMap() }
@@ -528,8 +526,7 @@ internal object RustCustomBuiltins {
     }
 
     private fun textOf(vf: com.intellij.openapi.vfs.VirtualFile) =
-        com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)?.text
-            ?: String(vf.contentsToByteArray(), vf.charset)
+        TeraFiles.textOf(vf)
 
     private class Callee(val doc: String?, val target: PsiElement?, val args: List<Pair<String, Boolean>>)
 
@@ -567,7 +564,7 @@ internal object RustCustomBuiltins {
     private fun functionByName(context: PsiElement, name: String): RsFunction? {
         val project = context.project
         val pattern = Regex("""\bfn\s+${Regex.escape(name)}\b""")
-        for (vf in FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))) {
+        for (vf in TeraFiles.projectFiles(project, "rs")) {
             if ("/target/" in vf.path) continue
             val m = pattern.find(textOf(vf)) ?: continue
             val leaf = PsiManager.getInstance(project).findFile(vf)?.findElementAt(m.range.last) ?: continue
@@ -582,7 +579,7 @@ internal object RustCustomBuiltins {
         val trait = when (kind) { "function" -> "Function"; "filter" -> "Filter"; else -> "Test" }
         val pattern = Regex("""\bimpl\s+(?:[A-Za-z_:]*::)?$trait\s+for\s+${Regex.escape(typeName)}\b""")
         val project = context.project
-        for (vf in FilenameIndex.getAllFilesByExt(project, "rs", GlobalSearchScope.projectScope(project))) {
+        for (vf in TeraFiles.projectFiles(project, "rs")) {
             if ("/target/" in vf.path) continue
             val m = pattern.find(textOf(vf)) ?: continue
             val leaf = PsiManager.getInstance(project).findFile(vf)?.findElementAt(m.range.first) ?: continue

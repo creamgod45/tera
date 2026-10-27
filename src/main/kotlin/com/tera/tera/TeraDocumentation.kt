@@ -402,8 +402,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             is Described.Import -> {
                 val vFile: VirtualFile? = file.originalFile.virtualFile
                 val templates = vFile?.let { TeraImports.templatesOf(it, d.imp.path) }.orEmpty().map { (f, macros) ->
-                    val src = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(f)?.text
-                        ?: String(f.contentsToByteArray(), f.charset)
+                    val src = TeraFiles.textOf(f)
                     Triple(f.name, src, macros)
                 }
                 TeraDocumentation.importHtml(d.imp, templates)

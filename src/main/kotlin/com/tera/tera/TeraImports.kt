@@ -7,8 +7,7 @@ object TeraImports {
     /** Every template that [path] names when imported from [from], with the macros each defines. */
     fun templatesOf(from: VirtualFile, path: String): List<Pair<VirtualFile, List<MacroDef>>> =
         TeraTemplateResolver.resolveAll(from, path).map { target ->
-            val text = FileDocumentManager.getInstance().getDocument(target)?.text
-                ?: String(target.contentsToByteArray(), target.charset)
+            val text = TeraFiles.textOf(target)
             target to TeraSymbolScanner.scan(text).macros
         }
 

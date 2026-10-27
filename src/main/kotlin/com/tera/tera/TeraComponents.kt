@@ -200,13 +200,12 @@ class TeraComponent(val def: ComponentDef, val file: VirtualFile?)
 /** Components are global in Tera 2: every `component` tag in any template of the project defines one. */
 object TeraComponents {
 
-    private fun textOf(f: VirtualFile): String =
-        FileDocumentManager.getInstance().getDocument(f)?.text ?: String(f.contentsToByteArray(), f.charset)
+    private fun textOf(f: VirtualFile): String = TeraFiles.textOf(f)
 
     /** All definitions in the project's templates, cached until any PSI changes. */
     fun project(project: Project): List<TeraComponent> =
         CachedValuesManager.getManager(project).getCachedValue(project) {
-            val found = FilenameIndex.getAllFilesByExt(project, "tera", GlobalSearchScope.projectScope(project))
+            val found = TeraFiles.projectFiles(project, "tera")
                 .filter { "/target/" !in it.path }
                 .sortedBy { it.path }
                 .flatMap { f ->

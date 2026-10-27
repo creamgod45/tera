@@ -234,6 +234,15 @@ class TeraRustCustomBuiltinsTest : BasePlatformTestCase() {
         assertEmpty(found)
     }
 
+    fun testDirectoriesNamedLikeRustFilesAreIgnored() {
+        myFixture.tempDirFixture.findOrCreateDir("vendor/odd.rs")
+        val found = find(rocketStyle)
+        assertEquals(setOf("url_for", "shorten", "blank"), found.map { it.def.name }.toSet())
+        myFixture.tempDirFixture.findOrCreateDir("templates/odd.tera")
+        val template = myFixture.addFileToProject("templates/index.html.tera", "")
+        assertNull(TeraRustContextProvider().resolve(project, template.virtualFile))
+    }
+
     fun testRustFilesUnderTargetAreIgnored() {
         myFixture.addFileToProject("target/debug/build/gen.rs", header +
             """fn g(tera: &mut Tera) { tera.register_function("generated", f); }""")

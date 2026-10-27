@@ -123,11 +123,9 @@ object TeraContexts {
 
     /** Templates in the project whose `extends`/`include` tags name [target]. */
     fun dependentsOf(project: Project, target: VirtualFile): List<VirtualFile> {
-        val scope = GlobalSearchScope.projectScope(project)
-        return FilenameIndex.getAllFilesByExt(project, "tera", scope).filter { other ->
+        return TeraFiles.projectFiles(project, "tera").filter { other ->
             if (other == target) return@filter false
-            val text = FileDocumentManager.getInstance().getDocument(other)?.text
-                ?: String(other.contentsToByteArray(), other.charset)
+            val text = TeraFiles.textOf(other)
             INHERIT.findAll(text).any { m -> target in TeraTemplateResolver.resolveAll(other, m.groupValues[1]) }
         }
     }

@@ -104,7 +104,7 @@ object TeraVersions {
         CargoManifest.majorOf(requirement)?.let { if (it >= 2) TeraVersion.V2 else TeraVersion.V1 }
 
     private fun read(file: VirtualFile): String =
-        FileDocumentManager.getInstance().getDocument(file)?.text ?: String(file.contentsToByteArray(), file.charset)
+        TeraFiles.textOf(file)
 
     /** The version for a template: the project setting, else what the nearest Cargo manifest says, else [TeraVersion.DEFAULT]. */
     fun forFile(project: Project, file: VirtualFile?): TeraVersionInfo {

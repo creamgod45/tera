@@ -24,12 +24,11 @@ object TeraMigrationRunner {
     class Report(val changed: List<FileResult>, val applied: Int, val remaining: List<Pair<VirtualFile, TeraError>>)
 
     fun templates(project: Project): List<VirtualFile> =
-        FilenameIndex.getAllFilesByExt(project, "tera", GlobalSearchScope.projectScope(project))
+        TeraFiles.projectFiles(project, "tera")
             .filter { "/target/" !in it.path && "/node_modules/" !in it.path }
             .sortedBy { it.path }
 
-    private fun textOf(file: VirtualFile): String =
-        FileDocumentManager.getInstance().getDocument(file)?.text ?: String(file.contentsToByteArray(), file.charset)
+    private fun textOf(file: VirtualFile): String = TeraFiles.textOf(file)
 
     /** What the migration would do to [files]; nothing is written. */
     fun plan(project: Project, files: List<VirtualFile>): List<FileResult> {
