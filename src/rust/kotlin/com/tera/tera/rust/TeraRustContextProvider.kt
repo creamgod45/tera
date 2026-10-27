@@ -664,7 +664,7 @@ internal object RustCustomBuiltins {
                     BuiltinParam(it.first, it.second, null, if (it.second) "required argument" else "argument read by the Rust code")
                 }
                 val def = contrib ?: BuiltinDef(name, description, params, positional = positionalTest, source = source, details = doc)
-                found[kind to name] = TeraCustomBuiltin(kind, def, callee?.target ?: args.getOrNull(0))
+                found[kind to name] = TeraCustomBuiltin(kind, def, callee?.target ?: args.getOrNull(0), callee?.returns)
             }
         }
         return found.values.toList()
@@ -673,7 +673,7 @@ internal object RustCustomBuiltins {
     private fun textOf(vf: com.intellij.openapi.vfs.VirtualFile) =
         TeraFiles.textOf(vf)
 
-    private class Callee(val doc: String?, val target: PsiElement?, val args: List<Pair<String, Boolean>>)
+    private class Callee(val doc: String?, val target: PsiElement?, val args: List<Pair<String, Boolean>>, val returns: TeraType? = null)
 
     private fun calleeOf(expr0: RsExpr?, kind: String, nameLiteral: PsiElement?, positionalTest: Boolean): Callee? {
         var expr: PsiElement = expr0 ?: return null
@@ -683,7 +683,7 @@ internal object RustCustomBuiltins {
         }
         return try {
             when (expr) {
-                is RsLambdaExpr -> Callee(null, nameLiteral, if (positionalTest) emptyList() else argSpecs(expr.text, kind))
+                is RsLambdaExpr -> Callee(null, nameLiteral, if (positionalTest) emptyList() else argSpecs(expr.text, kind), RustReturns.of(expr, null))
                 is RsPathExpr -> {
                     val target = (expr.path.reference?.resolve() as? RsFunction)
                         ?: expr.path.referenceName?.let { functionByName(expr, it) }
@@ -704,7 +704,7 @@ internal object RustCustomBuiltins {
     }
 
     private fun fromFunction(fn: RsFunction, kind: String, positionalTest: Boolean) =
-        Callee(RustTypes.docOf(fn.text), fn.identifier, if (positionalTest) emptyList() else argSpecs(fn.text, kind))
+        Callee(RustTypes.docOf(fn.text), fn.identifier, if (positionalTest) emptyList() else argSpecs(fn.text, kind), RustReturns.of(fn, RustTypes.docOf(fn.text)))
 
     private fun functionByName(context: PsiElement, name: String): RsFunction? {
         val project = context.project
@@ -729,7 +729,7 @@ internal object RustCustomBuiltins {
             val m = pattern.find(textOf(vf)) ?: continue
             val leaf = PsiManager.getInstance(project).findFile(vf)?.findElementAt(m.range.first) ?: continue
             val impl = PsiTreeUtil.getParentOfType(leaf, RsImplItem::class.java, false) ?: continue
-            return Callee(RustTypes.docOf(impl.text), impl, if (positionalTest) emptyList() else argSpecs(impl.text, kind))
+            return Callee(RustTypes.docOf(impl.text), impl, if (positionalTest) emptyList() else argSpecs(impl.text, kind), RustReturns.of(impl, RustTypes.docOf(impl.text)))
         }
         return null
     }
@@ -786,5 +786,65 @@ internal object RustCustomBuiltins {
         val d = entry.second
         return BuiltinDef(name, d.description, d.params, d.example, d.positional, source,
             "From tera-contrib (${d.name}). Registered in Rust ($source).")
+    }
+}
+
+
+/**
+ * What a registered filter or function produces. Tera 1 filters return `Result<Value>`, so the Rust signature says
+ * nothing; the type comes from, in order: a `/// @returns array<string>` doc line (the project's own statement), then the
+ * values the body builds: `to_value(x)` with the type of `x`, `Value::Array(..)`, `Value::Object(..)`, `json!([..])`,
+ * `json!({..})`. When the returns disagree, or none can be read, the result is unknown and nothing is guessed.
+ */
+internal object RustReturns {
+    fun of(root: PsiElement, doc: String?): TeraType? {
+        com.tera.tera.TeraTypeSyntax.fromDoc(doc)?.let { return it }
+        val found = mutableListOf<TeraType>()
+        for (call in PsiTreeUtil.findChildrenOfType(root, RsCallExpr::class.java)) {
+            val path = (call.expr as? RsPathExpr)?.path?.text ?: continue
+            val last = path.substringAfterLast("::")
+            val qualifier = path.substringBeforeLast("::", "")
+            when {
+                last == "to_value" -> call.valueArgumentList.exprList.firstOrNull()?.let { found.add(typeOf(it)) }
+                qualifier.endsWith("Value") -> when (last) {
+                    "Array" -> found.add(TeraType.ArrayOf(TeraType.Unknown))
+                    "Object" -> found.add(TeraType.MapOf(TeraType.Unknown))
+                    "String" -> found.add(TeraType.Scalar("string"))
+                    "Number" -> found.add(TeraType.Scalar("number"))
+                    "Bool" -> found.add(TeraType.Scalar("bool"))
+                }
+            }
+        }
+        for (m in PsiTreeUtil.findChildrenOfType(root, RsMacroExpr::class.java)) {
+            if (m.macroCall.path?.referenceName != "json") continue
+            val body = m.macroCall.text.let { it.substring(it.indexOfFirst { c -> c == '(' || c == '{' || c == '[' } + 1) }.trimStart()
+            when {
+                body.startsWith("[") -> found.add(TeraType.ArrayOf(TeraType.Unknown))
+                body.startsWith("{") -> found.add(TeraType.MapOf(TeraType.Unknown))
+                body.startsWith("\"") -> found.add(TeraType.Scalar("string"))
+            }
+        }
+        val known = found.filter { it != TeraType.Unknown }
+        if (known.isEmpty() || known.map { kind(it) }.distinct().size != 1) return null
+        return known.minByOrNull { informationLost(it) }
+    }
+
+    private fun typeOf(e: RsExpr): TeraType {
+        val inferred = RustTypes.toTera(RustTypes.typeOf(e), 0, emptySet())
+        return if (inferred != TeraType.Unknown) inferred else RustTypes.guess(e.text, e)
+    }
+
+    private fun kind(t: TeraType): String = when (t) {
+        is TeraType.Scalar -> t.name
+        is TeraType.ArrayOf, is TeraType.Tuple -> "array"
+        is TeraType.MapOf, is TeraType.Struct -> "map"
+        TeraType.Unknown -> "any"
+    }
+
+    private fun informationLost(t: TeraType): Int = when (t) {
+        TeraType.Unknown -> 1
+        is TeraType.ArrayOf -> informationLost(t.element)
+        is TeraType.MapOf -> informationLost(t.value)
+        else -> 0
     }
 }

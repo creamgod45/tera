@@ -15,6 +15,30 @@ enum class TeraSnippetKind { FOR, FOR_ELSE, JOIN }
 /** [text] replaces the whole `{{ .. }}`; the caret is put [caret] characters into it. */
 data class TeraSnippet(val kind: TeraSnippetKind, val title: String, val text: String, val caret: Int)
 
+/** The written form of a [TeraType], as in a `/// @returns array<string>` line above a Rust filter. */
+object TeraTypeSyntax {
+    private val ANNOTATION = Regex("""@returns?\s+([^\n]+)""")
+
+    /** The type a doc comment declares with `@returns`, or null. */
+    fun fromDoc(doc: String?): TeraType? = doc?.let { ANNOTATION.find(it) }?.let { parse(it.groupValues[1]) }
+
+    /** `string`, `number`, `bool`, `any`, `array<T>` / `T[]`, `map<T>`; null if it is none of these. */
+    fun parse(text: String): TeraType? {
+        var t = text.trim().trimEnd('.', ',', ';')
+        if (t.endsWith("[]")) return parse(t.removeSuffix("[]"))?.let { TeraType.ArrayOf(it) }
+        t = t.lowercase().let { if (it.startsWith("array<") || it.startsWith("map<")) text.trim().trimEnd('.', ',', ';') else it }
+        return when {
+            t == "string" || t == "str" -> TeraType.Scalar("string")
+            t == "number" || t == "integer" || t == "int" || t == "float" -> TeraType.Scalar("number")
+            t == "bool" || t == "boolean" -> TeraType.Scalar("bool")
+            t == "any" || t == "value" -> TeraType.Unknown
+            t.lowercase().startsWith("array<") && t.endsWith(">") -> parse(t.substring(6, t.length - 1))?.let { TeraType.ArrayOf(it) }
+            t.lowercase().startsWith("map<") && t.endsWith(">") -> parse(t.substring(4, t.length - 1))?.let { TeraType.MapOf(it) }
+            else -> null
+        }
+    }
+}
+
 object TeraIterate {
 
     /** `categories` → `category`, `entries` → `entry`, `items` → `item`, `data` → `item`. */
@@ -65,7 +89,9 @@ object TeraIterate {
      * What a filter does to the type of a list or map, for the filters that keep or produce one; `Unknown` for the rest
      * (`length`, `join`, ... give a plain value, and a filter the plugin does not know is not guessed).
      */
-    fun afterFilter(name: String, input: TeraType): TeraType {
+    fun afterFilter(name: String, input: TeraType, custom: List<TeraCustomBuiltin> = emptyList()): TeraType {
+        // A filter the project registers wins over Tera's own of the same name; what it returns comes from its Rust code.
+        custom.firstOrNull { it.kind == "filter" && it.def.name == name }?.let { return it.returns ?: TeraType.Unknown }
         val list = (input as? TeraType.ArrayOf)?.element ?: (input as? TeraType.Tuple)?.elements?.firstOrNull()
         return when (name) {
             "sort", "reverse", "unique", "slice", "concat", "filter" ->
@@ -86,7 +112,7 @@ object TeraIterate {
      */
     class Target(val blockStart: Int, val blockEnd: Int, val expr: String, val type: TeraType, val name: String, val item: String?)
 
-    fun targetAt(text: String, offset: Int, context: TeraContextResult?, version: TeraVersion): Target? {
+    fun targetAt(text: String, offset: Int, context: TeraContextResult?, version: TeraVersion, custom: List<TeraCustomBuiltin> = emptyList()): Target? {
         val blocks = TeraSymbolScanner.scanBlocks(text)
         val block = blocks.firstOrNull { it.kind == '{' && it.closed && offset in (it.contentStart - 2)..(it.contentEnd + 2) } ?: return null
         val t = block.tokens
@@ -119,7 +145,7 @@ object TeraIterate {
                 }
                 if (j >= t.size) break           // the call is not closed yet
             } else j = i + 1
-            type = afterFilter(nameTok.text, type)
+            type = afterFilter(nameTok.text, type, custom)
             last = nameTok.text
             end = t[j].range.endOffset
             i = j + 1
@@ -142,7 +168,7 @@ abstract class TeraIterateIntention(private val kind: TeraSnippetKind) : Intenti
     private fun snippet(project: Project, editor: Editor?, file: PsiFile?): Pair<TeraIterate.Target, TeraSnippet>? {
         if (file !is TeraFile || editor == null) return null
         val vFile = file.originalFile.virtualFile
-        val target = TeraIterate.targetAt(file.text, editor.caretModel.offset, TeraContexts.forFile(file), TeraVersions.forFile(project, vFile).version)
+        val target = TeraIterate.targetAt(file.text, editor.caretModel.offset, TeraContexts.forFile(file), TeraVersions.forFile(project, vFile).version, TeraContexts.customBuiltins(project))
             ?: return null
         val snippet = TeraIterate.snippets(target.expr, target.type, target.name, target.item).firstOrNull { it.kind == kind } ?: return null
         return target to snippet

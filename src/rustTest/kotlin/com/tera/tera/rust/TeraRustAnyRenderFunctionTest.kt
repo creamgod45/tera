@@ -135,3 +135,62 @@ class TeraRustConstPathAndCompletionTest : BasePlatformTestCase() {
         assertEmpty(complete("fn go() { let x = \"pa<caret>\"; }"))
     }
 }
+
+/** The type a Rust filter produces, read from its code, for the loops offered after it. */
+class TeraRustFilterReturnsTest : BasePlatformTestCase() {
+
+    private val header = "use std::collections::HashMap;\nuse rocket_dyn_templates::tera::{Tera, Value, Result, to_value};\n"
+
+    private var files = 0
+
+    /** Each call adds its own source file; the filter is looked up by the name it is registered under. */
+    private fun returns(rust: String, name: String): com.tera.tera.TeraType? {
+        val unique = "f${files++}"
+        myFixture.addFileToProject("src/$unique.rs", header + rust.replace("\"f\"", "\"$unique\"").replace("register_filter(\"$unique\", f)", "register_filter(\"$unique\", f)"))
+        return RustCustomBuiltins.find(project).first { it.kind == "filter" && it.def.name == unique }.returns
+    }
+
+    private val register = "pub fn customize(tera: &mut Tera) { tera.register_filter(\"f\", f); }\n"
+
+    fun testTheDocLineStatesIt() {
+        assertEquals(com.tera.tera.TeraType.ArrayOf(com.tera.tera.TeraType.Scalar("string")), returns("""
+            /// Splits tags.
+            /// @returns array<string>
+            fn f(value: &Value, _: &HashMap<String, Value>) -> Result<Value> { Ok(value.clone()) }
+        """.trimIndent() + "\n" + register, "f"))
+    }
+
+    fun testToValueOfAVecIsAList() {
+        val t = returns("""
+            fn f(value: &Value, _: &HashMap<String, Value>) -> Result<Value> {
+                let parts: Vec<String> = value.as_str().unwrap_or("").split(',').map(String::from).collect();
+                Ok(to_value(parts).unwrap())
+            }
+        """.trimIndent() + "\n" + register, "f")
+        assertEquals(com.tera.tera.TeraType.ArrayOf(com.tera.tera.TeraType.Scalar("string")), t)
+    }
+
+    fun testValueArrayAndObjectAndJson() {
+        assertTrue(returns("fn f(v: &Value, _: &HashMap<String, Value>) -> Result<Value> { Ok(Value::Array(vec![])) }\n$register", "f") is com.tera.tera.TeraType.ArrayOf)
+        assertTrue(returns("fn f(v: &Value, _: &HashMap<String, Value>) -> Result<Value> { Ok(Value::Object(Default::default())) }\n$register", "f") is com.tera.tera.TeraType.MapOf)
+    }
+
+    fun testAClosureIsReadToo() {
+        myFixture.addFileToProject("src/main.rs", header + """
+            pub fn customize(tera: &mut Tera) {
+                tera.register_filter("f", |v: &Value, _: &HashMap<String, Value>| Ok(Value::String("x".into())));
+            }
+        """.trimIndent())
+        assertEquals(com.tera.tera.TeraType.Scalar("string"), RustCustomBuiltins.find(project).first { it.def.name == "f" }.returns)
+    }
+
+    fun testDisagreeingOrUnreadableReturnsGiveNothing() {
+        assertNull(returns("""
+            fn f(v: &Value, _: &HashMap<String, Value>) -> Result<Value> {
+                if v.is_null() { return Ok(Value::Array(vec![])); }
+                Ok(Value::String("x".into()))
+            }
+        """.trimIndent() + "\n" + register, "f"))
+        assertNull(returns("fn f(v: &Value, _: &HashMap<String, Value>) -> Result<Value> { Ok(v.clone()) }\n$register", "f"))
+    }
+}

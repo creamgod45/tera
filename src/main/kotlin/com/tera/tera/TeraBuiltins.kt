@@ -47,7 +47,13 @@ class BuiltinDef(
 }
 
 /** A function, filter or test registered by the project's Rust code (`register_function` and friends). */
-class TeraCustomBuiltin(val kind: String, val def: BuiltinDef, val target: com.intellij.psi.PsiElement?)
+class TeraCustomBuiltin(
+    val kind: String,
+    val def: BuiltinDef,
+    val target: com.intellij.psi.PsiElement?,
+    /** What a filter or function produces, when the Rust code or a `@returns` doc line says (see [TeraTypeSyntax]). */
+    val returns: TeraType? = null,
+)
 
 object TeraBuiltins {
     /**

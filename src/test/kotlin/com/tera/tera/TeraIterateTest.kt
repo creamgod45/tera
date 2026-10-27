@@ -143,3 +143,49 @@ class TeraIterateTest : BasePlatformTestCase() {
         assertTrue(TeraIterate.afterFilter("group_by", list) is TeraType.MapOf)
     }
 }
+
+/** What a filter the project registers produces decides whether a loop is offered after it. */
+class TeraCustomFilterIterateTest : BasePlatformTestCase() {
+
+    private fun filter(name: String, returns: TeraType?) =
+        TeraCustomBuiltin("filter", BuiltinDef(name, "custom"), null, returns)
+
+    fun testTheDeclaredTypeSyntax() {
+        assertEquals(TeraType.ArrayOf(TeraType.Scalar("string")), TeraTypeSyntax.parse("array<string>"))
+        assertEquals(TeraType.ArrayOf(TeraType.Scalar("number")), TeraTypeSyntax.parse("number[]"))
+        assertEquals(TeraType.MapOf(TeraType.ArrayOf(TeraType.Scalar("string"))), TeraTypeSyntax.parse("map<array<string>>"))
+        assertEquals(TeraType.Scalar("bool"), TeraTypeSyntax.parse("Boolean."))
+        assertEquals(TeraType.Unknown, TeraTypeSyntax.parse("any"))
+        assertNull(TeraTypeSyntax.parse("Vec<Foo>"))
+        assertEquals(TeraType.ArrayOf(TeraType.Scalar("string")), TeraTypeSyntax.fromDoc("Splits tags.\n@returns array<string>\nmore"))
+        assertNull(TeraTypeSyntax.fromDoc("nothing declared"))
+    }
+
+    fun testAProjectFilterDecidesTheTypeAfterIt() {
+        val custom = listOf(filter("tags", TeraType.ArrayOf(TeraType.Scalar("string"))), filter("shout", TeraType.Scalar("string")), filter("mystery", null))
+        val text = TeraType.Scalar("string")
+        assertEquals(TeraType.ArrayOf(TeraType.Scalar("string")), TeraIterate.afterFilter("tags", text, custom))
+        assertEquals(TeraType.Scalar("string"), TeraIterate.afterFilter("shout", text, custom))
+        assertEquals(TeraType.Unknown, TeraIterate.afterFilter("mystery", text, custom))
+        // Without the registration the name is just an unknown filter.
+        assertEquals(TeraType.Unknown, TeraIterate.afterFilter("tags", text))
+        // The project's own filter replaces Tera's of the same name.
+        assertEquals(TeraType.Unknown, TeraIterate.afterFilter("sort", TeraType.ArrayOf(text), listOf(filter("sort", null))))
+    }
+
+    fun testTheIntentionFollowsAProjectFilter() {
+        TeraSettings.getInstance(project).loadState(TeraSettingsState())
+        TeraSettings.getInstance(project).state.version = "2"
+        val provider = object : TeraContextProvider {
+            override fun resolve(project: com.intellij.openapi.project.Project, template: com.intellij.openapi.vfs.VirtualFile) =
+                TeraContextResult(listOf(TeraField("post", TeraType.Struct("Post", listOf(TeraField("tags", TeraType.Scalar("string")))))), true)
+            override fun customBuiltins(project: com.intellij.openapi.project.Project) =
+                listOf(filter("split_tags", TeraType.ArrayOf(TeraType.Scalar("string"))))
+        }
+        TeraContextProvider.EP.point.registerExtension(provider, testRootDisposable)
+        myFixture.configureByText("t.html.tera", "{{ post.tags | split_tags<caret> }}")
+        val action = myFixture.availableIntentions.first { it.text.startsWith("Tera: for tag in post.tags | split_tags") }
+        myFixture.launchAction(action)
+        assertEquals("{% for tag in post.tags | split_tags %}{{ tag }}{% endfor %}", myFixture.editor.document.text)
+    }
+}

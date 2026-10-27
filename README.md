@@ -207,8 +207,13 @@ Rocket's forms example with both engines, the rest from Tera 2's sources and mig
 - **Lists and maps that are printed as they are.** `{{ categories }}` shows `["Travel", "Equipment"]`; when the Rust type
   is an array, `Vec`, slice or map, completion on `{{ cate|` also offers *for category in categories* (with the field
   of the element for records) and, for lists of plain values, *categories | join(sep=", ")*; Alt+Enter on the variable
-  offers the same (also after filters that keep or produce a list: `| sort`, `| reverse`, `| unique`, `| slice(..)`, a map's `| values` and `| keys`; an unfinished trailing `|` is ignored) as *Tera: for …*, *for … else (when empty)* and *join*. The loop variable is named from the list
+  offers the same (also after filters that keep or produce a list: `| sort`, `| reverse`, `| unique`, `| slice(..)`, a map's `| values` and `| keys`; an unfinished trailing `|` is ignored; and filters you register from Rust, see below) as *Tera: for …*, *for … else (when empty)* and *join*. The loop variable is named from the list
   (`categories` → `category`).
+- **What your own filters return.** A filter registered with `register_filter` is followed by the loop offer when its
+  Rust code says it produces a list or map. In order: a doc line `/// @returns array<string>` (also `map<T>`, `string`,
+  `number`, `bool`, `T[]`), else what the body builds (`to_value(parts)` with the type of `parts`, `Value::Array(..)`,
+  `Value::Object(..)`, `json!([..])`). If the returns disagree or cannot be read, nothing is guessed. The doc line is the
+  deterministic way to tell the plugin.
 - **Template paths while typing.** Inside the string of a call, `show("pa|")` offers the project's templates, written
   the way the project already writes them (`pages/detail.html` if its strings carry the extension, Rocket's
   `pages/detail` otherwise). A `const PAGE: &str = "pages/x";` passed to the call counts as the path too.
