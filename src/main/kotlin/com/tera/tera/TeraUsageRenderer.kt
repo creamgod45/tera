@@ -1,7 +1,9 @@
 package com.tera.tera
 
 import com.intellij.codeInsight.navigation.GotoTargetHandler
+import com.intellij.codeInsight.navigation.GotoTargetPresentationProvider
 import com.intellij.codeInsight.navigation.GotoTargetRendererProvider
+import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.ide.util.PsiElementListCellRenderer
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiDocumentManager
@@ -43,6 +45,15 @@ class TeraUsageRenderer : PsiElementListCellRenderer<PsiElement>() {
 class TeraGotoRendererProvider : GotoTargetRendererProvider {
     override fun getRenderer(element: PsiElement, gotoData: GotoTargetHandler.GotoData): PsiElementListCellRenderer<*>? =
         if (TeraUsageRenderer.isTemplatePlace(element)) TeraUsageRenderer() else null
+}
+
+/** The chooser of newer platform versions asks for a presentation instead of a renderer. */
+class TeraGotoPresentationProvider : GotoTargetPresentationProvider {
+    override fun getTargetPresentation(element: PsiElement, differentNames: Boolean): TargetPresentation? {
+        if (!TeraUsageRenderer.isTemplatePlace(element)) return null
+        val (text, place) = TeraUsageRenderer.describe(element)
+        return TargetPresentation.builder(text).icon(TeraIcons.FILE).containerText(place).presentation()
+    }
 }
 
 val teraUsageRenderer: Computable<PsiElementListCellRenderer<*>> = Computable { TeraUsageRenderer() }

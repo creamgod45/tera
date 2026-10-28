@@ -165,6 +165,7 @@
 
         <!-- Lists of usages and definitions show the line and file:line -->
         <gotoTargetRendererProvider implementation="com.tera.tera.TeraGotoRendererProvider"/>
+        <gotoTargetPresentationProvider implementation="com.tera.tera.TeraGotoPresentationProvider"/>
 
         <!-- Gutter: block overrides along the extends chain -->
         <codeInsight.lineMarkerProvider language="Tera"
