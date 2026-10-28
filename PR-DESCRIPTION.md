@@ -1,6 +1,6 @@
 # Tera plugin: fewer false errors, Tera 2, and Laravel-Idea-style editing
 
-Draft for the pull request body (paste and trim).
+The full list of changes is in `CHANGELOG.md`.
 
 ## What this does
 
@@ -26,6 +26,9 @@ template from the Rust string, template names while typing in Rust.
 
 **Lists and maps.** `{{ list }}` is pointed out with what the engine prints, with loop / loop-else / join quick fixes (also
 Alt+Enter, also after filters that keep a list, also for filters registered in Rust).
+
+**Lists of usages.** Usage and definition lists (gutter icons, Cmd+click chooser) show the line of the template and
+`file:line`; one gutter icon per line when it calls several components.
 
 **Errors.** Template errors in the Run window are links.
 
