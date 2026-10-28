@@ -1,88 +1,63 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>com.tera.tera</id>
-    <name>Tera</name>
+    <id>com.creamgod45.tera.studio</id>
+    <name>Tera Template Studio</name>
 
-    <vendor>CURED-FSZ</vendor>
+    <vendor url="https://github.com/creamgod45/tera">creamgod45</vendor>
 
     <description><![CDATA[
         <p>
-          IDE support for <a href="https://keats.github.io/tera/">Tera</a> template files
-          (<code>.tera</code>) — a Rust template engine with Jinja2-style syntax.
+          Editor support for <a href="https://keats.github.io/tera/">Tera</a> templates (<code>.tera</code>), the
+          template engine of Rust web projects (Rocket, Zola and others). Works with Tera 2 and Tera 1.
         </p>
 
-        <h3>Syntax Highlighting</h3>
+        <h3>Rust-aware</h3>
         <ul>
-          <li>Variable blocks &nbsp;<code>{{ }}</code></li>
-          <li>Tag blocks &nbsp;<code>{% %}</code></li>
-          <li>Comments &nbsp;<code>{# #}</code></li>
-          <li>Whitespace-trimming variants &nbsp;<code>{{- -}}</code> &nbsp;<code>{%- -%}</code></li>
-          <li>Fine-grained token colors: keywords, identifiers, strings, numbers, operators</li>
-          <li>Fully customizable via <b>Settings → Editor → Color Scheme → Tera Template</b></li>
+          <li>Variables, fields and types come from the Rust code that renders the template (any render function,
+              generic page shells, <code>#[serde(flatten)]</code>, Rocket's form <code>Context</code>); layouts and partials
+              inherit them</li>
+          <li>Functions, filters and tests registered from Rust, with documentation and go to definition</li>
+          <li>Open a template from the Rust string that names it; complete template paths while typing in Rust; template
+              roots from <code>Rocket.toml</code>, <code>Tera::new</code>, <code>relative!</code>, <code>set_current_dir</code>
+              or a setting</li>
+          <li>Variables of data without Rust types can be described in a JSON Schema file</li>
         </ul>
 
-        <h3>Error Detection</h3>
+        <h3>Tera 2 and Tera 1</h3>
         <ul>
-          <li>Unclosed delimiters &nbsp;(<code>{{</code>, <code>{%</code>, <code>{#</code>)</li>
-          <li>Mismatched or unclosed block tags
-              (<code>for</code>, <code>if</code>, <code>block</code>,
-               <code>macro</code>, <code>raw</code>, <code>filter</code>)</li>
-          <li><code>else</code> / <code>elif</code> outside an <code>if</code> block</li>
-          <li>No-argument keywords used with extra content
-              (e.g. <code>{% endif something %}</code>)</li>
-          <li>Missing loop variable or <code>in</code> keyword in <code>for</code> tags</li>
-          <li>Invalid tag names (e.g. <code>{% in ... %}</code>)</li>
-          <li>Dangling or doubled dot operators
-              (e.g. <code>item.</code>, <code>loop..index</code>)</li>
+          <li>The version is detected per template; built-ins, tags and checks follow it</li>
+          <li>Components, typed parameters and type checks; migration from Tera 1 to Tera 2 for a file or a project</li>
         </ul>
 
-        <h3>Supported Keywords</h3>
-        <p>
-          <code>for</code> · <code>if</code> · <code>elif</code> · <code>else</code> ·
-          <code>block</code> · <code>macro</code> · <code>raw</code> · <code>filter</code> ·
-          <code>set</code> · <code>set_global</code> · <code>extends</code> ·
-          <code>include</code> · <code>import</code> · <code>from</code> ·
-          <code>break</code> · <code>continue</code>
-        </p>
+        <h3>Editing</h3>
+        <ul>
+          <li>Highlighting with HTML, CSS and JavaScript inside templates; whitespace control; clear syntax errors</li>
+          <li>Completion and hover for variables, filters, tests, macros and components</li>
+          <li>Comment, brace matching, auto-closing delimiters, folding, live templates, Reformat Code</li>
+          <li>Loop, loop-else and join quick fixes for a list or map printed as it is</li>
+        </ul>
+
+        <h3>Navigation and refactoring</h3>
+        <ul>
+          <li>Go to definition, blocks along the <code>extends</code> chain, usages of components with the line and file</li>
+          <li>Find Usages and Rename for blocks, macros, variables, components and template files (Rust strings follow)</li>
+          <li>Template errors in the Run window are links to the template</li>
+        </ul>
 
         <hr/>
 
         <p>
-          为 <a href="https://keats.github.io/tera/">Tera</a> 模板文件（<code>.tera</code>）提供 IDE 支持。
-          Tera 是一个使用 Jinja2 风格语法的 Rust 模板引擎。
+          為 <a href="https://keats.github.io/tera/">Tera</a> 模板（<code>.tera</code>）提供編輯支援，支援 Tera 2 與 Tera 1。
         </p>
-
-        <h3>语法高亮</h3>
         <ul>
-          <li>变量块 &nbsp;<code>{{ }}</code></li>
-          <li>标签块 &nbsp;<code>{% %}</code></li>
-          <li>注释 &nbsp;<code>{# #}</code></li>
-          <li>空白裁剪语法 &nbsp;<code>{{- -}}</code> &nbsp;<code>{%- -%}</code></li>
-          <li>细粒度 token 着色：关键字、标识符、字符串、数字、运算符</li>
-          <li>可在 <b>Settings → Editor → Color Scheme → Tera Template</b> 中自定义配色</li>
+          <li><b>Rust 感知</b>：變數、欄位與型別來自渲染模板的 Rust 程式碼；自訂 function／filter／test；從 Rust 字串開啟模板；
+              模板根目錄可自動偵測或手動設定；沒有 Rust 型別的資料可用 JSON Schema 描述</li>
+          <li><b>Tera 2 與 Tera 1</b>：依模板偵測版本；元件、型別檢查；可從 Tera 1 遷移到 Tera 2</li>
+          <li><b>編輯</b>：語法上色（內含 HTML／CSS／JavaScript）、補全與懸停文件、註解、括號配對、自動補全、摺疊、Live Template、
+              Reformat Code；直接輸出清單或 map 時提供迴圈與 join 的快速修正</li>
+          <li><b>導覽與重構</b>：跳到定義、沿 <code>extends</code> 鏈的 block 導覽、元件使用處（顯示行內容與檔案）、
+              Find Usages 與 Rename（含模板檔案與 Rust 字串）、Run 視窗的錯誤連結</li>
         </ul>
-
-        <h3>错误检测</h3>
-        <ul>
-          <li>未闭合的定界符（<code>{{</code>、<code>{%</code>、<code>{#</code>）</li>
-          <li>块标签不匹配或未闭合
-              （<code>for</code>、<code>if</code>、<code>block</code>、
-               <code>macro</code>、<code>raw</code>、<code>filter</code>）</li>
-          <li><code>else</code> / <code>elif</code> 出现在 <code>if</code> 块外</li>
-          <li>不接受参数的关键字后附带多余内容（如 <code>{% endif something %}</code>）</li>
-          <li><code>for</code> 标签缺少循环变量或 <code>in</code> 关键字</li>
-          <li>非法标签名（如 <code>{% in ... %}</code>）</li>
-          <li>悬空或重复的点号运算符（如 <code>item.</code>、<code>loop..index</code>）</li>
-        </ul>
-
-        <h3>支持的关键字</h3>
-        <p>
-          <code>for</code> · <code>if</code> · <code>elif</code> · <code>else</code> ·
-          <code>block</code> · <code>macro</code> · <code>raw</code> · <code>filter</code> ·
-          <code>set</code> · <code>set_global</code> · <code>extends</code> ·
-          <code>include</code> · <code>import</code> · <code>from</code> ·
-          <code>break</code> · <code>continue</code>
-        </p>
     ]]></description>
 
     <depends>com.intellij.modules.lang</depends>
