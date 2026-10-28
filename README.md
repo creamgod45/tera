@@ -260,6 +260,10 @@ closing tags `{% </ui.card> %}`, in one undoable command, refusing a name that i
 **template file** updates the template names in `extends`/`include`/`import` (written with or without the extension) and
 the Rust strings that name it (`render("pages/detail.html", ..)`, in RustRover).
 
+The lists that Cmd+click and the gutter icons open (usages of a component, overrides of a block, the definition of a
+call) show the line each place is on with `file:line` beside it, like the usage popup for Rust, so a usage can be
+recognised without opening it.
+
 ### Usages and render contexts
 
 - **Where is this component used?** A gutter icon on a `{% component %}` definition shows its number of usages and

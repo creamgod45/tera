@@ -163,6 +163,9 @@
         <renamePsiElementProcessor implementation="com.tera.tera.TeraRenameProcessor"/>
         <targetElementEvaluator language="Tera" implementationClass="com.tera.tera.TeraTargetElementEvaluator"/>
 
+        <!-- Lists of usages and definitions show the line and file:line -->
+        <gotoTargetRendererProvider implementation="com.tera.tera.TeraGotoRendererProvider"/>
+
         <!-- Gutter: block overrides along the extends chain -->
         <codeInsight.lineMarkerProvider language="Tera"
                                         implementationClass="com.tera.tera.TeraBlockLineMarkerProvider"/>

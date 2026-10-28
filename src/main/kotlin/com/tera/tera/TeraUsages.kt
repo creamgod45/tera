@@ -82,6 +82,7 @@ class TeraComponentLineMarkerProvider : RelatedItemLineMarkerProvider() {
                     .setTargets(NotNullLazyValue.lazy { usages.mapNotNull { TeraUsages.elementAt(project, it.file, it.range.startOffset) } })
                     .setTooltipText("${usages.size} usage${if (usages.size == 1) "" else "s"} of ${def.name}")
                     .setPopupTitle("Usages of ${def.name}")
+                    .setCellRenderer(teraUsageRenderer)
                     .createLineMarkerInfo(element),
             )
             return
@@ -96,6 +97,7 @@ class TeraComponentLineMarkerProvider : RelatedItemLineMarkerProvider() {
                     })
                     .setTooltipText("Component ${call.name}")
                     .setPopupTitle("Definition of ${call.name}")
+                    .setCellRenderer(teraUsageRenderer)
                     .createLineMarkerInfo(element),
             )
         }

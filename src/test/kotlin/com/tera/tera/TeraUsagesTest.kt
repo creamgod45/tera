@@ -55,3 +55,32 @@ class TeraUsagesTest : BasePlatformTestCase() {
         assertEquals(listOf("Component ui.badge", "Component ui.badge"), tips)
     }
 }
+
+/** The lists show the line the place is on and `file:line`, so a usage can be recognised without opening it. */
+class TeraUsageRendererTest : BasePlatformTestCase() {
+
+    override fun setUp() {
+        super.setUp()
+        TeraSettings.getInstance(project).loadState(TeraSettingsState())
+        TeraSettings.getInstance(project).state.version = "2"
+    }
+
+    fun testALineAndItsLocation() {
+        myFixture.addFileToProject("templates/components.html.tera", "{% component ui.card(title: string = \"\") %}x{% endcomponent %}")
+        myFixture.addFileToProject("templates/a.html.tera", "<div>\n    {% <ui.card   title=\"A\"> %}\n</div>")
+        val usage = TeraUsages.ofComponent(project, "ui.card").single()
+        val element = TeraUsages.elementAt(project, usage.file, usage.range.startOffset)!!
+        val (text, place) = TeraUsageRenderer.describe(element)
+        assertEquals("{% <ui.card title=\"A\"> %}", text)
+        assertEquals("a.html.tera:2", place)
+        assertEquals(text, TeraUsageRenderer().getElementText(element))
+    }
+
+    fun testLongLinesAreCut() {
+        val long = "{% <ui.card title=\"" + "x".repeat(300) + "\"> %}"
+        myFixture.addFileToProject("templates/b.html.tera", long)
+        val file = myFixture.findFileInTempDir("templates/b.html.tera")
+        val element = TeraUsages.elementAt(project, file, 5)!!
+        assertTrue(TeraUsageRenderer.describe(element).first.length <= 110)
+    }
+}

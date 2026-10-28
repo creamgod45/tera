@@ -128,6 +128,7 @@ class TeraBlockLineMarkerProvider : RelatedItemLineMarkerProvider() {
                 .setTargets(targets(parents))
                 .setTooltipText("Overrides block ${def.name} in ${parents.joinToString { it.first.name }}")
                 .setPopupTitle("Block ${def.name} in the parent template")
+                .setCellRenderer(teraUsageRenderer)
                 .createLineMarkerInfo(element))
         }
         if (overriders.isNotEmpty()) {
@@ -135,6 +136,7 @@ class TeraBlockLineMarkerProvider : RelatedItemLineMarkerProvider() {
                 .setTargets(targets(overriders))
                 .setTooltipText("Block ${def.name} is overridden in ${overriders.size} template${if (overriders.size == 1) "" else "s"}")
                 .setPopupTitle("Templates that override block ${def.name}")
+                .setCellRenderer(teraUsageRenderer)
                 .createLineMarkerInfo(element))
         }
     }
