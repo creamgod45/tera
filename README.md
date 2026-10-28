@@ -209,6 +209,32 @@ parent template, following the `extends` chain through templates that do not def
 lists the templates that override it. Gutter icons show *Overrides block x in base.html* and *Block x is overridden in
 N templates*.
 
+### Variables described by a file
+
+For data that no Rust type describes (a `json!` value, a `serde_json::Value`, a static site generator), describe the
+variables with a JSON Schema subset (`type`, `properties`, `items`, `additionalProperties`, `description`, `title`, local
+`$ref`) and get the same completion, hover and checks. Put `detail.html.schema.json` next to `detail.html.tera`, or a
+`tera-context.json` in the template directory (or above it):
+
+```json
+{ "mappings": { "pages/*.html": "schemas/page.json",
+                "**": { "type": "object", "properties": { "site": { "type": "object" } } } } }
+```
+
+Keys are globs (`*`, `**`, `?`) over the template's name relative to that file, with or without the extension; values are
+a path to a schema or an inline schema. Layouts and partials get the variables of the pages that use them, Rust-derived
+variables win on a conflict, and a schema only counts as complete, so that unknown variables are reported, with
+`"additionalProperties": false` at its root.
+
+### Printing a list or map
+
+`{{ categories }}` where `categories` is a list is marked (weak warning), and an object too (a warning in Tera 1, which
+prints `[object]`); the message says what the engine really prints (Tera 1: `[a, b]` for a list; Tera 2: JSON), checked
+against Tera 1.20.1 and 2.4.0. Quick fixes: the loop, the loop with an empty case, the join, and for an object a field to
+print. Only a whole list or object is reported, also after filters that keep it (`| sort`), not `| length` or `| join`.
+Settings → Tera can switch it off. A chain that stops after `|` (`{{ categories | values | }}`) is an error, with a fix
+that removes the bar.
+
 ### Errors in the Run window
 
 When a Rust program prints a template error, the position becomes a link to the template: Tera 2's

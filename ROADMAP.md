@@ -94,7 +94,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
 - 6.3 Tests on the fixtures (S)
 - Done when: clicking an error in the Rocket run window opens the template at that position.
 
-## 7. Warning for printing a list or map (S–M)
+## 7. Warning for printing a list or map (S–M) — done (also: an unfinished `|` is a syntax error)
 
 - 7.1 Inspection rule (M)
   - 7.1.1 `{{ x }}` where x is a list or map by Rust type; message depends on version (Tera 1 `[object]`, Tera 2 JSON)
@@ -118,7 +118,7 @@ Order of work: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 9; 10 runs alongside. I
 - 8.5 Tests on a small sample site (M)
 - Done when: a Zola theme template has no false "undefined variable" and completes `page.`.
 
-## 9. Context description file for non-Rust data (M)
+## 9. Context description file for non-Rust data (M) — done
 
 - 9.1 File format (S): a JSON Schema subset (`type`, `properties`, `items`, `description`)
 - 9.2 Mapping rules (S): template glob → schema file, in settings or a `tera.json` next to the templates

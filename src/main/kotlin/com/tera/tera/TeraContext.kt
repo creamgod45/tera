@@ -55,6 +55,8 @@ class TeraContextResult(
     val variables: List<TeraField>,
     val complete: Boolean,
     val sources: List<String> = emptyList(),
+    /** A description kept in a file, which yields to what the Rust code says when both name a variable. */
+    val fallback: Boolean = false,
 )
 
 /** Supplies the render context of a template, e.g. by reading the Rust code that renders it. */
@@ -151,7 +153,7 @@ object TeraContexts {
     fun merge(results: List<TeraContextResult>, forceIncomplete: Boolean = false): TeraContextResult? {
         if (results.isEmpty()) return null
         val byName = linkedMapOf<String, TeraField>()
-        for (r in results) for (v in r.variables) byName.putIfAbsent(v.name, v)
+        for (r in results.sortedBy { it.fallback }) for (v in r.variables) byName.putIfAbsent(v.name, v)
         return TeraContextResult(
             byName.values.toList(), !forceIncomplete && results.all { it.complete }, results.flatMap { it.sources }.distinct(),
         )

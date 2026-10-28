@@ -190,6 +190,9 @@ class TeraSettingsState {
      * detects from `Rocket.toml`, `Tera::new(..)` and the working directory.
      */
     var templateRoots: String = ""
+
+    /** Point out a list or map that `{{ }}` prints as it is. */
+    var printWarnings: Boolean = true
 }
 
 @Service(Service.Level.PROJECT)

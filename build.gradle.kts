@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.tera"
-version = "1.2.0"
+version = "1.3.0"
 
 repositories {
     mavenCentral()
@@ -67,6 +67,11 @@ intellijPlatform {
         }
 
         changeNotes = """
+            Editor basics: Cmd+/ comments with {# #}, brace matching, auto-closing of {{, {% and {#, folding of block/for/if/macro/component/filter/raw, live templates (macro/import for Tera 1, component/ternary/comprehension for Tera 2), and Reformat Code that re-indents by tag nesting.
+            Navigation: blocks along the extends chain (go to the parent block, overrides and super() with gutter icons), usages of a component, template names in Rust strings, and clickable template errors in the Run window.
+            Refactoring: Find Usages and Rename for blocks, macros, variables and components, and renaming or moving a template file updates extends/include/import and the Rust strings that name it.
+            Render context: found by meaning from any call that passes a template path and a serializable value (generic page shells, let locals, Rocket form Context), custom filters' return types, a Template roots setting, and variables described by a JSON Schema file (tera-context.json).
+            Lists and maps: loop/join quick fixes for {{ list }}, a warning for printing them as they are, and an error for an unfinished filter chain.
             Fix false errors for whitespace-trimming delimiters and named endmacro/endblock tags.
             Check macro calls against definitions (including import "..." as alias) and add macro, argument, namespace, keyword and template-name completion.
             Types for Tera 2: unknown component parameter types and defaults of another type, values of the wrong type for a component attribute, and filters or tests applied to a value of a kind they reject, with convert quick fixes and fit-first completion.

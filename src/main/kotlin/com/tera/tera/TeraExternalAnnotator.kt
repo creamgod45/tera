@@ -28,6 +28,7 @@ class TeraAnnotatorInput(
     val custom: List<TeraCustomBuiltin> = emptyList(),
     val migrationHints: Boolean = true,
     val components: List<TeraComponent> = emptyList(),
+    val printWarnings: Boolean = true,
 )
 
 class TeraExternalAnnotator : ExternalAnnotator<TeraAnnotatorInput, List<TeraError>>() {
@@ -43,18 +44,21 @@ class TeraExternalAnnotator : ExternalAnnotator<TeraAnnotatorInput, List<TeraErr
             text, imported, TeraContexts.forFile(file), TeraVersions.forFile(file.project, vFile).version,
             TeraContexts.customBuiltins(file.project), TeraSettings.getInstance(file.project).state.migrationHints,
             TeraComponents.visible(file.project, vFile, text),
+            TeraSettings.getInstance(file.project).state.printWarnings,
         )
     }
 
     override fun doAnnotate(input: TeraAnnotatorInput): List<TeraError> =
-        analyze(input.text) + TeraSemanticChecker.check(input.text) { input.importedMacros[it] } +
+        analyze(input.text) + TeraPrintChecks.dangling(input.text) +
+            (if (input.printWarnings) TeraPrintChecks.printed(input.text, input.context, input.version, input.custom) else emptyList()) +
+            TeraSemanticChecker.check(input.text) { input.importedMacros[it] } +
             TeraVariables.check(input.text, input.context, input.version) +
             TeraMigration.check(input.text, input.version, input.custom, input.migrationHints) +
             (if (input.version == TeraVersion.V2) TeraComponentChecker.check(input.text, input.components) +
                 TeraTypeChecker.check(input.text, input.context, input.components, input.custom) else emptyList())
 
     /** Syntax checks only (block structure, tag shapes); no cross-template analysis. */
-    fun doAnnotate(fileText: String): List<TeraError> = analyze(fileText)
+    fun doAnnotate(fileText: String): List<TeraError> = analyze(fileText) + TeraPrintChecks.dangling(fileText)
 
     override fun apply(file: PsiFile, errors: List<TeraError>?, holder: AnnotationHolder) {
         errors?.forEach { err ->

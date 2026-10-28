@@ -16,6 +16,7 @@ class TeraSettingsConfigurable(private val project: Project) : Configurable {
     private val choices = listOf("auto" to "Detect from Cargo.toml (default: Tera 2.x)", "1" to "Tera 1.x", "2" to "Tera 2.x")
     private val combo = JComboBox(choices.map { it.second }.toTypedArray())
     private val hints = JCheckBox("In Tera 1.x projects, mark constructs that Tera 2 removed or renamed")
+    private val prints = JCheckBox("Mark a list or map that {{ }} prints as it is, with a quick fix to loop over it")
     private val roots = com.intellij.ui.components.JBTextArea(4, 40)
 
     override fun getDisplayName() = "Tera"
@@ -38,7 +39,7 @@ class TeraSettingsConfigurable(private val project: Project) : Configurable {
         }
         return JPanel(BorderLayout()).apply {
             border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
-            add(JPanel(BorderLayout()).apply { add(row, BorderLayout.NORTH); add(hints, BorderLayout.CENTER); add(note, BorderLayout.SOUTH) }, BorderLayout.NORTH)
+            add(JPanel(BorderLayout()).apply { add(row, BorderLayout.NORTH); add(JPanel(BorderLayout()).apply { add(hints, BorderLayout.NORTH); add(prints, BorderLayout.SOUTH) }, BorderLayout.CENTER); add(note, BorderLayout.SOUTH) }, BorderLayout.NORTH)
             add(rootsPanel, BorderLayout.CENTER)
             reset()
         }
@@ -47,18 +48,20 @@ class TeraSettingsConfigurable(private val project: Project) : Configurable {
     private val state get() = TeraSettings.getInstance(project).state
 
     override fun isModified() =
-        choices[combo.selectedIndex].first != state.version || hints.isSelected != state.migrationHints ||
+        choices[combo.selectedIndex].first != state.version || hints.isSelected != state.migrationHints || prints.isSelected != state.printWarnings ||
             roots.text.trim() != state.templateRoots.trim()
 
     override fun apply() {
         state.version = choices[combo.selectedIndex].first
         state.migrationHints = hints.isSelected
+        state.printWarnings = prints.isSelected
         state.templateRoots = roots.text.trim()
     }
 
     override fun reset() {
         combo.selectedIndex = choices.indexOfFirst { it.first == state.version }.coerceAtLeast(0)
         hints.isSelected = state.migrationHints
+        prints.isSelected = state.printWarnings
         roots.text = state.templateRoots
     }
 }

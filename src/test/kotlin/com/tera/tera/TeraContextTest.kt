@@ -148,7 +148,7 @@ class TeraContextTest : BasePlatformTestCase() {
 
     fun testAnnotatorUsesContextFromProviders() {
         install("index.html.tera" to todoContext())
-        val file = myFixture.addFileToProject("templates/index.html.tera", "{{ tasks }}{{ taks }}")
+        val file = myFixture.addFileToProject("templates/index.html.tera", "{{ tasks | length }}{{ taks }}")
         val annotator = TeraExternalAnnotator()
         val input = annotator.collectInformation(file)!!
         assertNotNull(input.context)

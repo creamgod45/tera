@@ -115,6 +115,14 @@ object TeraIterate {
     fun targetAt(text: String, offset: Int, context: TeraContextResult?, version: TeraVersion, custom: List<TeraCustomBuiltin> = emptyList()): Target? {
         val blocks = TeraSymbolScanner.scanBlocks(text)
         val block = blocks.firstOrNull { it.kind == '{' && it.closed && offset in (it.contentStart - 2)..(it.contentEnd + 2) } ?: return null
+        return targetIn(text, blocks, block, context, version, custom)
+    }
+
+    /** [targetAt] for a `{{ }}` [block] already found; [blocks] are the blocks of [text] (variable scopes depend on them). */
+    fun targetIn(
+        text: String, blocks: List<TeraBlock>, block: TeraBlock, context: TeraContextResult?, version: TeraVersion,
+        custom: List<TeraCustomBuiltin> = emptyList(), occurrences: List<VarOccurrence>? = null,
+    ): Target? {
         val t = block.tokens
         // The variable path: names and numbers joined by dots.
         var i = 0
@@ -123,11 +131,14 @@ object TeraIterate {
         if (i == 0) return null
         if (i % 2 == 0) i--          // a trailing dot belongs to nothing
         val path = t.subList(0, i)
-        val ref = TeraVariables.refAt(text, path.last().range.startOffset, context, version) ?: return null
-        if (ref.index != ref.occurrence.segs.size - 1) return null
+        val occs = occurrences ?: TeraVariables.collect(blocks, TeraScopes.snapshots(blocks, context, version, text))
+        val occurrence = occs.firstOrNull { it.tokens.firstOrNull()?.range?.startOffset == path.first().range.startOffset } ?: return null
+        if (occurrence.segs.size != (path.size + 1) / 2) return null
+        val resolved = occurrence.resolve(occurrence.segs.size - 1, context)
+        if (resolved.failedAt >= 0) return null
 
         // `| name` or `| name(...)`, repeated; an unfinished tail is ignored.
-        var type = ref.result.type
+        var type = resolved.type
         var end = path.last().range.endOffset
         var last: String? = null
         while (i < t.size) {

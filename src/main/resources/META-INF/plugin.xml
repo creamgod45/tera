@@ -95,7 +95,11 @@
         <extensionPoint qualifiedName="com.tera.contextProvider" interface="com.tera.tera.TeraContextProvider" dynamic="true"/>
     </extensionPoints>
 
-<extensions defaultExtensionNs="com.intellij">
+<extensions defaultExtensionNs="com.tera">
+        <contextProvider implementation="com.tera.tera.TeraSchemaContextProvider"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
         <lang.ast.factory language="Tera" implementationClass="com.tera.tera.TeraAstFactory"/>
         <lang.fileViewProviderFactory language="Tera"
             implementationClass="com.tera.tera.TeraFileViewProviderFactory"/>
