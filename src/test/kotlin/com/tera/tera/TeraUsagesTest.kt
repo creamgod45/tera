@@ -84,6 +84,15 @@ class TeraUsageRendererTest : BasePlatformTestCase() {
         assertTrue(TeraUsageRenderer.isTemplatePlace(element))
     }
 
+    fun testTwoCallsOnALineGiveOneIconWithBothDefinitions() {
+        myFixture.addFileToProject("templates/components.html.tera",
+            "{% component ui.badge(status: string) %}x{% endcomponent %}\n{% component ui.button(label: string) %}y{% endcomponent %}")
+        myFixture.configureByText("a.html.tera", "{{ <ui.badge status=\"a\"/> }}{{ <ui.button label=\"b\"/> }}")
+        val gutters = myFixture.findAllGutters().filter { it.tooltipText?.startsWith("Components") == true }
+        assertEquals(1, gutters.size)
+        assertEquals("Components ui.badge, ui.button", gutters.single().tooltipText)
+    }
+
     fun testLongLinesAreCut() {
         val long = "{% <ui.card title=\"" + "x".repeat(300) + "\"> %}"
         myFixture.addFileToProject("templates/b.html.tera", long)

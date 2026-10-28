@@ -88,15 +88,24 @@ class TeraComponentLineMarkerProvider : RelatedItemLineMarkerProvider() {
             return
         }
         marks.calls[start]?.let { call ->
-            val defs = TeraComponents.visible(project, vFile, file.text).filter { it.def.name == call.name }
+            // Several calls on one line would get merged by the platform into a list that only shows the element
+            // text ("ui", "ui"); one icon per line lists every definition with its source line instead.
+            val text = file.text
+            val lineStart = text.lastIndexOf('\n', start - 1) + 1
+            val lineEnd = text.indexOf('\n', start).let { if (it < 0) text.length else it }
+            val onLine = marks.calls.values.filter { it.nameRange.startOffset in lineStart until lineEnd }
+            if (onLine.minOf { it.nameRange.startOffset } != start) return
+            val visible = TeraComponents.visible(project, vFile, text)
+            val names = onLine.map { it.name }.distinct()
+            val defs = visible.filter { it.def.name in names }.distinctBy { it.file to it.def.nameRange.startOffset }
             if (defs.isEmpty()) return
             result.add(
                 NavigationGutterIconBuilder.create(AllIcons.Gutter.ImplementingMethod)
                     .setTargets(NotNullLazyValue.lazy {
                         defs.mapNotNull { TeraUsages.elementAt(project, it.file ?: vFile, it.def.nameRange.startOffset) }
                     })
-                    .setTooltipText("Component ${call.name}")
-                    .setPopupTitle("Definition of ${call.name}")
+                    .setTooltipText(if (names.size == 1) "Component ${names[0]}" else "Components ${names.joinToString()}")
+                    .setPopupTitle(if (names.size == 1) "Definition of ${names[0]}" else "Definitions of ${names.joinToString()}")
                     .setCellRenderer(teraUsageRenderer)
                     .createLineMarkerInfo(element),
             )
