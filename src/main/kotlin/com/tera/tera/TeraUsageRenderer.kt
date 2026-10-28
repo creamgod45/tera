@@ -57,3 +57,10 @@ class TeraGotoPresentationProvider : GotoTargetPresentationProvider {
 }
 
 val teraUsageRenderer: Computable<PsiElementListCellRenderer<*>> = Computable { TeraUsageRenderer() }
+
+/** What a name or string of a template looks like wherever the platform lists it as a target: its line and `file:line`. */
+class TeraPlacePresentation(private val element: PsiElement) : com.intellij.navigation.ItemPresentation {
+    override fun getPresentableText(): String = TeraUsageRenderer.describe(element).first
+    override fun getLocationString(): String = TeraUsageRenderer.describe(element).second
+    override fun getIcon(unused: Boolean): Icon = TeraIcons.FILE
+}

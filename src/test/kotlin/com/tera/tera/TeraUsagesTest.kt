@@ -82,6 +82,9 @@ class TeraUsageRendererTest : BasePlatformTestCase() {
         val usage = TeraUsages.ofComponent(project, "form.select").single()
         val element = TeraUsages.elementAt(project, usage.file, usage.range.startOffset)!!
         assertTrue(TeraUsageRenderer.isTemplatePlace(element))
+        val shown = com.intellij.codeInsight.navigation.targetPresentation(element)
+        assertEquals("a.html.tera:1", shown.containerText)
+        assertTrue(shown.presentableText.contains("form.select"))
         val presentation = TeraGotoPresentationProvider().getTargetPresentation(element, false)!!
         assertEquals("a.html.tera:1", presentation.containerText)
         assertTrue(presentation.presentableText.contains("form.select"))

@@ -1,5 +1,8 @@
 package com.tera.tera
 
+import com.intellij.navigation.ItemPresentation
+import com.intellij.navigation.NavigationItem
+import com.intellij.ide.util.PsiNavigationSupport
 import com.intellij.lang.cacheBuilder.DefaultWordsScanner
 import com.intellij.lang.cacheBuilder.WordsScanner
 import com.intellij.lang.findUsages.FindUsagesProvider
@@ -128,8 +131,15 @@ object TeraSymbolAnalysis {
 }
 
 /** An identifier of a template: a declaration, a reference, or neither. */
-class TeraNameLeaf(type: IElementType, text: CharSequence) : LeafPsiElement(type, text), PsiNamedElement {
+class TeraNameLeaf(type: IElementType, text: CharSequence) : LeafPsiElement(type, text), PsiNamedElement, NavigationItem {
     override fun getName(): String = text
+
+    override fun getPresentation(): ItemPresentation = TeraPlacePresentation(this)
+    override fun navigate(requestFocus: Boolean) {
+        PsiNavigationSupport.getInstance().getDescriptor(this)?.navigate(requestFocus)
+    }
+    override fun canNavigate(): Boolean = PsiNavigationSupport.getInstance().canNavigate(this)
+    override fun canNavigateToSource(): Boolean = canNavigate()
 
     override fun setName(name: String): PsiElement {
         replaceWithText(name)
@@ -189,7 +199,15 @@ class TeraRenameProcessor : com.intellij.refactoring.rename.RenamePsiElementProc
 }
 
 /** The string of `extends "layouts/app.html"` and friends: a reference to the template file. */
-class TeraStringLeaf(type: IElementType, text: CharSequence) : LeafPsiElement(type, text) {
+class TeraStringLeaf(type: IElementType, text: CharSequence) : LeafPsiElement(type, text), NavigationItem {
+    override fun getName(): String = text
+    override fun getPresentation(): ItemPresentation = TeraPlacePresentation(this)
+    override fun navigate(requestFocus: Boolean) {
+        PsiNavigationSupport.getInstance().getDescriptor(this)?.navigate(requestFocus)
+    }
+    override fun canNavigate(): Boolean = PsiNavigationSupport.getInstance().canNavigate(this)
+    override fun canNavigateToSource(): Boolean = canNavigate()
+
     override fun getReference(): PsiReference? {
         val path = containingFile?.let { TeraSymbolAnalysis.of(it) }?.paths?.get(textRange.startOffset) ?: return null
         return TeraTemplateReference(this, path)
