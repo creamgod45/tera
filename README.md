@@ -1,5 +1,7 @@
 # Tera for JetBrains IDEs
 
+User guide: [English](docs/USER-GUIDE.md) · [繁體中文](docs/USER-GUIDE.zh-TW.md) · [Changelog](CHANGELOG.md)
+
 Editor support for [Tera](https://github.com/Keats/tera) templates (`.tera`).
 
 ## Editing templates
