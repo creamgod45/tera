@@ -39,8 +39,8 @@
 - **Template roots（模板根目錄）**：一行一個目錄，相對於專案或絕對路徑。解析模板名稱時（`extends`、`include`、`import`，以及
   Rust 裡的 `render("…")`）最先採用；其次是外掛從 `Rocket.toml`（`template_dir`）、`Tera::new("…")`、`relative!`、
   `set_current_dir` 偵測到的目錄；最後才是 `templates`。
-- **Migration hints（遷移提示）**：在 Tera 1 專案裡，用刪除線標示 Tera 2 移除或改名的項目。
-- **Warn when a list or map is printed as it is（直接輸出清單或 map 時警告）**：第 8 節的警告開關。
+- **In Tera 1.x projects, mark constructs that Tera 2 removed or renamed**（遷移提示）：在 Tera 1 專案裡，用刪除線標示 Tera 2 移除或改名的項目。
+- **Mark a list or map that {{ }} prints as it is, with a quick fix to loop over it**（直接輸出清單或 map 的警告）：第 8 節的警告開關。
 
 其他位置：**Settings → Languages & Frameworks → Template Data Languages**（指定模板的 HTML／CSS／JS 語言）、
 **Editor → Color Scheme → Tera Template**（配色）。

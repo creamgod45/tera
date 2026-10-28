@@ -42,8 +42,8 @@ Open a Rocket or Tera project and a template such as `templates/pages/detail.htm
 - **Template roots**: one directory per line, relative to the project or absolute. Used first when a template name is
   resolved (`extends`, `include`, `import`, and `render("…")` in Rust); then what the plugin detects from `Rocket.toml`
   (`template_dir`), `Tera::new("…")`, `relative!`, `set_current_dir`; then `templates`.
-- **Migration hints**: strikes through what Tera 2 removed or renamed in a Tera 1 project.
-- **Warn when a list or map is printed as it is**: the warning behind section 8.
+- **In Tera 1.x projects, mark constructs that Tera 2 removed or renamed**: the migration hints (strikethrough, weak warning).
+- **Mark a list or map that {{ }} prints as it is, with a quick fix to loop over it**: the warning behind section 8.
 
 Other places: **Settings → Languages & Frameworks → Template Data Languages** (choose the HTML/CSS/JS language of a
 template), **Editor → Color Scheme → Tera Template** (colors).
