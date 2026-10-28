@@ -161,15 +161,33 @@ class TeraFoldingBuilder : FoldingBuilderEx(), DumbAware {
     override fun isCollapsedByDefault(node: ASTNode) = false
 }
 
-/** The live-template contexts: any Tera template, and the ones that only make sense in Tera 1 or only in Tera 2. */
+/** Whether [offset] is inside a `{{ }}`, `{% %}` or `{# #}` that is not closed yet before it. */
+internal fun insideDelimiters(text: CharSequence, offset: Int): Boolean {
+    val before = text.subSequence(0, offset.coerceIn(0, text.length)).toString()
+    val open = maxOf(before.lastIndexOf("{{"), before.lastIndexOf("{%"), before.lastIndexOf("{#"))
+    if (open < 0) return false
+    val close = maxOf(before.lastIndexOf("}}"), before.lastIndexOf("%}"), before.lastIndexOf("#}"))
+    return close < open
+}
+
+/**
+ * The live-template contexts. Statements (`for`, `if`, `block`, ...) only make sense in the text of a template, never
+ * inside a `{{ }}` or `{% %}` already open, so those contexts are text only; the expression context is for what goes inside.
+ */
 class TeraTemplateContext : com.intellij.codeInsight.template.TemplateContextType("Tera") {
     override fun isInContext(context: com.intellij.codeInsight.template.TemplateActionContext) =
-        context.file.viewProvider.baseLanguage == TeraLanguage
+        context.file.viewProvider.baseLanguage == TeraLanguage && !insideDelimiters(context.file.text, context.startOffset)
+}
+
+class TeraV2ExpressionContext : com.intellij.codeInsight.template.TemplateContextType("Tera 2 expression") {
+    override fun isInContext(context: com.intellij.codeInsight.template.TemplateActionContext) =
+        context.file.viewProvider.baseLanguage == TeraLanguage && insideDelimiters(context.file.text, context.startOffset) &&
+            TeraVersions.forFile(context.file.project, context.file.originalFile.virtualFile).version == TeraVersion.V2
 }
 
 private fun versionContext(context: com.intellij.codeInsight.template.TemplateActionContext, version: TeraVersion): Boolean {
     val file = context.file
-    if (file.viewProvider.baseLanguage != TeraLanguage) return false
+    if (file.viewProvider.baseLanguage != TeraLanguage || insideDelimiters(file.text, context.startOffset)) return false
     return TeraVersions.forFile(file.project, file.originalFile.virtualFile).version == version
 }
 

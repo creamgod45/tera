@@ -153,6 +153,7 @@
         <liveTemplateContext contextId="TERA" implementation="com.tera.tera.TeraTemplateContext"/>
         <liveTemplateContext contextId="TERA_V1" baseContextId="TERA" implementation="com.tera.tera.TeraV1TemplateContext"/>
         <liveTemplateContext contextId="TERA_V2" baseContextId="TERA" implementation="com.tera.tera.TeraV2TemplateContext"/>
+        <liveTemplateContext contextId="TERA_V2_EXPRESSION" implementation="com.tera.tera.TeraV2ExpressionContext"/>
         <defaultLiveTemplates file="liveTemplates/Tera"/>
 
         <!-- Find Usages and Rename of blocks, macros and variables -->

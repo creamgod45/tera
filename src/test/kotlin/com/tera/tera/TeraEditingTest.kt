@@ -154,9 +154,32 @@ class TeraLiveTemplatesTest : BasePlatformTestCase() {
     }
 
     fun testComponentsAndTernaryAreTera2Only() {
-        val v2 = setOf("component", "comp", "compbody", "setblock", "ternary", "comprehension", "break", "continue")
+        val v2 = setOf("component", "comp", "compbody", "setblock", "ternary", "break", "continue")
         assertTrue(applicable("2").containsAll(v2))
         assertTrue(applicable("1").none { it in v2 })
+    }
+
+    private fun applicableAt(text: String, version: String = "2"): Set<String> {
+        TeraSettings.getInstance(project).loadState(TeraSettingsState())
+        TeraSettings.getInstance(project).state.version = version
+        myFixture.configureByText("u.html.tera", text)
+        val ctx = com.intellij.codeInsight.template.TemplateActionContext.expanding(myFixture.file, myFixture.editor)
+        return com.intellij.codeInsight.template.impl.TemplateManagerImpl.listApplicableTemplates(ctx)
+            .filter { it.groupName == "Tera" }.map { it.key }.toSet()
+    }
+
+    fun testStatementsAreNotOfferedInsideADelimiter() {
+        for (text in listOf("{{ categories | values | <caret> }}", "{% if <caret> %}", "{# <caret> #}")) {
+            val keys = applicableAt(text)
+            assertTrue(text, keys.none { it in setOf("forloop", "forkv", "if", "block", "xx", "component") })
+        }
+        assertTrue(applicableAt("{{ a }} <caret>").contains("forkv"))
+    }
+
+    fun testComprehensionIsOfferedInsideAnExpressionOnly() {
+        assertTrue(applicableAt("{{ <caret> }}").contains("comprehension"))
+        assertFalse(applicableAt("<p><caret></p>").contains("comprehension"))
+        assertFalse(applicableAt("{{ <caret> }}", "1").contains("comprehension"))
     }
 
     fun testExpansions() {

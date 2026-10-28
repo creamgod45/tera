@@ -117,7 +117,7 @@
     <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true" />
     <variable name="LIST" expression="" defaultValue="&quot;list&quot;" alwaysStopAt="true" />
     <variable name="COND" expression="" defaultValue="&quot;true&quot;" alwaysStopAt="true" />
-    <context><option name="TERA_V2" value="true" /></context>
+    <context><option name="TERA_V2_EXPRESSION" value="true" /></context>
   </template>
   <template name="break" value="{% break %}" description="break (Tera 2)" toReformat="false" toShortenFQNames="true">
     <context><option name="TERA_V2" value="true" /></context>
