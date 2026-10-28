@@ -35,7 +35,7 @@ class TeraUsageRenderer : PsiElementListCellRenderer<PsiElement>() {
             return shown to "${file.name}:$number"
         }
 
-        fun isTemplatePlace(element: PsiElement) = element is TeraNameLeaf || element is TeraStringLeaf
+        fun isTemplatePlace(element: PsiElement) = element.containingFile?.language?.isKindOf(TeraLanguage) == true
     }
 }
 

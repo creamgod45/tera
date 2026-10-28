@@ -76,6 +76,14 @@ class TeraUsageRendererTest : BasePlatformTestCase() {
         assertEquals(text, TeraUsageRenderer().getElementText(element))
     }
 
+    fun testEveryLeafOfATemplateGetsTheRenderer() {
+        myFixture.addFileToProject("templates/components.html.tera", "{% component form.select(name: string) %}x{% endcomponent %}")
+        myFixture.addFileToProject("templates/a.html.tera", "{{ <form.select name=\"a\"/> }}")
+        val usage = TeraUsages.ofComponent(project, "form.select").single()
+        val element = TeraUsages.elementAt(project, usage.file, usage.range.startOffset)!!
+        assertTrue(TeraUsageRenderer.isTemplatePlace(element))
+    }
+
     fun testLongLinesAreCut() {
         val long = "{% <ui.card title=\"" + "x".repeat(300) + "\"> %}"
         myFixture.addFileToProject("templates/b.html.tera", long)
