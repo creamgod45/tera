@@ -1,0 +1,60 @@
+{% extends "layouts/section.html" %}
+
+{% block subtitle %}{{ stats.total }} requests, ${{ stats.amount_total }} in total{% endblock subtitle %}
+
+{% block content %}
+{# Everything below is computed here, from the numbers Rust hands over: no chart library, no JavaScript. #}
+{% set max_dept = [d.amount for d in stats.by_department] | sort | last %}
+{% set max_cat = [c.amount for c in stats.by_category] | sort | last %}
+{% set max_month = [m.amount for m in stats.monthly] | sort | last %}
+{% set busiest = stats.by_department | sort(attribute="count") | last %}
+<div class="space-y-6" data-layer="page" data-page="stats">
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {{ <ui.stat label="Approval rate" value={stats.approval_rate ~ "%"} tone="indigo" hint={stats.approved ~ " approved, " ~ stats.rejected ~ " rejected"}/> }}
+    {{ <ui.stat label="Average request" value={"$" ~ (stats.amount_total // stats.total)} hint="across all requests"/> }}
+    {{ <ui.stat label="Busiest department" value={busiest.name} hint={busiest.count ~ " requests"} tone="amber"/> }}
+    {{ <ui.stat label="Still open" value={"$" ~ stats.amount_pending} hint={stats.pending ~ " pending"} tone="rose"/> }}
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    {% <ui.card title="Spend by department" subtitle="Total requested"> %}
+      <div class="space-y-4" data-chart="departments">
+        {% for d in stats.by_department %}
+          {{ <ui.bar label={d.name} value={d.amount} max={max_dept} tone="indigo" note={"$" ~ d.amount ~ " · " ~ d.count ~ " request" ~ (d.count | pluralize)}/> }}
+        {% endfor %}
+      </div>
+    {% </ui.card> %}
+    {% <ui.card title="Spend by category" subtitle="Total requested"> %}
+      <div class="space-y-4" data-chart="categories">
+        {% for c in stats.by_category %}
+          {{ <ui.bar label={c.name} value={c.amount} max={max_cat} tone="amber" note={"$" ~ c.amount}/> }}
+        {% endfor %}
+      </div>
+    {% </ui.card> %}
+  </div>
+
+  {% <ui.card title="Requests per month" subtitle="Amount requested, by expense date"> %}
+    <div class="flex h-48 items-end gap-3" data-chart="months">
+      {% for m in stats.monthly %}
+      <div class="flex flex-1 flex-col items-center justify-end gap-2" data-month="{{ m.month }}" data-height="{{ m.amount * 100 // max_month }}">
+        <span class="text-xs text-slate-500">${{ m.amount }}</span>
+        <div class="w-full rounded-t-md bg-indigo-500" style="height: {{ m.amount * 100 // max_month }}%"></div>
+        <span class="text-xs font-medium text-slate-600">{{ m.month[5:] }}/{{ m.month[2:4] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  {% </ui.card> %}
+
+  {% <ui.card title="Department scorecard"> %}
+    <table class="min-w-full text-sm" data-table="scorecard">
+      <thead class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th class="py-2">Department</th><th class="py-2 text-right">Requests</th><th class="py-2 text-right">Approved</th><th class="py-2 text-right">Approval</th><th class="py-2 text-right">Amount</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for d in stats.by_department | sort(attribute="amount") | reverse %}
+        <tr><td class="py-2 font-medium">{{ d.name }}</td><td class="py-2 text-right">{{ d.count }}</td><td class="py-2 text-right">{{ d.approved }}</td>
+            <td class="py-2 text-right">{{ (d.approved * 100 // d.count ~ "%") if d.count else "n/a" }}</td><td class="py-2 text-right font-medium">${{ d.amount }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% </ui.card> %}
+</div>
+{% endblock content %}

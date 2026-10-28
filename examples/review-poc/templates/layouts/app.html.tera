@@ -1,0 +1,42 @@
+{# Layer 2: the application shell: sidebar, top bar, flash message. Pages never repeat any of this. #}
+{% extends "base.html" %}
+
+{% block body %}
+{% set nav = [
+  {"key": "dashboard", "href": "/", "label": "Dashboard"},
+  {"key": "requests", "href": "/requests", "label": "Requests"},
+  {"key": "new", "href": "/requests/new", "label": "New request"},
+  {"key": "stats", "href": "/stats", "label": "Statistics"}
+] %}
+<div class="min-h-screen lg:flex" data-layer="app">
+  <aside class="border-b border-slate-200 bg-white lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r" data-slot="sidebar">
+    <div class="flex items-center gap-3 px-6 py-5">
+      <span class="grid h-9 w-9 place-items-center rounded-lg bg-indigo-600 font-bold text-white">E</span>
+      <span class="text-lg font-semibold tracking-tight">ExpenseFlow</span>
+    </div>
+    <nav class="space-y-1 px-3 pb-4">
+      {% for item in nav %}
+        {{ <ui.nav_item href={item.href} label={item.label} active={item.key == active}/> }}
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <div class="min-w-0 flex-1">
+    <header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3" data-slot="topbar">
+      <span class="text-sm text-slate-500">{{ title }}</span>
+      <div class="flex items-center gap-3">
+        <div class="text-right leading-tight">
+          <p class="text-sm font-medium">{{ user.name }}</p>
+          <p class="text-xs text-slate-500">{{ user.role }}</p>
+        </div>
+        <span class="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">{{ user.initials }}</span>
+      </div>
+    </header>
+
+    {% include "partials/flash.html" %}
+
+    <main class="px-6 py-8">{% block main %}{% endblock main %}</main>
+    <footer class="px-6 pb-8 text-xs text-slate-400">ExpenseFlow PoC · rendered by Tera 2 · no HTML is built in Rust</footer>
+  </div>
+</div>
+{% endblock body %}

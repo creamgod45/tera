@@ -30,7 +30,8 @@ class TeraLexer : LexerBase() {
             "macro", "endmacro",
             "raw", "endraw",
             "filter", "endfilter",
-            "set", "set_global",
+            "set", "set_global", "endset",
+            "component", "endcomponent",
             "extends", "include", "import", "from",
             "break", "continue",
             // 布尔/逻辑字面量和运算符关键字
@@ -51,6 +52,7 @@ class TeraLexer : LexerBase() {
     private var tokenEnd   = 0
     private var tokenType: IElementType? = null
     private var state = STATE_OUTER
+    private var tokenState = STATE_OUTER
 
     // ── LexerBase 实现 ───────────────────────────────────────────────────────
 
@@ -63,7 +65,7 @@ class TeraLexer : LexerBase() {
         advance()
     }
 
-    override fun getState()           = state
+    override fun getState()           = tokenState
     override fun getTokenType()       = tokenType
     override fun getTokenStart()      = tokenStart
     override fun getTokenEnd()        = tokenEnd
@@ -72,6 +74,7 @@ class TeraLexer : LexerBase() {
 
     override fun advance() {
         tokenStart = tokenEnd
+        tokenState = state
         if (tokenStart >= bufferEnd) { tokenType = null; return }
 
         when (state) {
@@ -96,10 +99,11 @@ class TeraLexer : LexerBase() {
                     tokenType = TeraTokenTypes.OUTER_TEXT
                     return
                 }
+                val delimiterLength = if (pos + 2 < bufferEnd && buffer[pos + 2] == '-') 3 else 2
                 when (buffer[pos + 1]) {
-                    '{' -> { emitDelimiter(pos, 2, TeraTokenTypes.VARIABLE_START, STATE_IN_VAR);     return }
-                    '%' -> { emitDelimiter(pos, 2, TeraTokenTypes.TAG_START,      STATE_IN_TAG);     return }
-                    '#' -> { emitDelimiter(pos, 2, TeraTokenTypes.COMMENT_START,  STATE_IN_COMMENT); return }
+                    '{' -> { emitDelimiter(pos, delimiterLength, TeraTokenTypes.VARIABLE_START, STATE_IN_VAR);     return }
+                    '%' -> { emitDelimiter(pos, delimiterLength, TeraTokenTypes.TAG_START,      STATE_IN_TAG);     return }
+                    '#' -> { emitDelimiter(pos, delimiterLength, TeraTokenTypes.COMMENT_START,  STATE_IN_COMMENT); return }
                 }
             }
             pos++
@@ -121,6 +125,12 @@ class TeraLexer : LexerBase() {
     private fun lexComment() {
         val pos = tokenStart
 
+        if (pos + 2 < bufferEnd && buffer[pos] == '-' &&
+            buffer[pos + 1] == '#' && buffer[pos + 2] == '}') {
+            emitDelimiter(pos, 3, TeraTokenTypes.COMMENT_END, STATE_OUTER)
+            return
+        }
+
         // 结束定界符 #}
         if (pos + 1 < bufferEnd && buffer[pos] == '#' && buffer[pos + 1] == '}') {
             tokenEnd  = pos + 2
@@ -132,6 +142,8 @@ class TeraLexer : LexerBase() {
         // 注释内容，扫描到 #} 为止
         var end = pos
         while (end < bufferEnd) {
+            if (buffer[end] == '-' && end + 2 < bufferEnd &&
+                buffer[end + 1] == '#' && buffer[end + 2] == '}') break
             if (buffer[end] == '#' && end + 1 < bufferEnd && buffer[end + 1] == '}') break
             end++
         }

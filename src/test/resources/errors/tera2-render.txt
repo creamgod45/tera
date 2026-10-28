@@ -1,0 +1,5 @@
+error: Variable `missing` is not defined.
+ --> pages/ok.html:1:7
+  |
+1 | <p>{{ missing }}</p>
+  |       ^^^^^^^

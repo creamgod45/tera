@@ -1,0 +1,58 @@
+{% extends "layouts/section.html" %}
+
+{% block subtitle %}{{ stats.pending }} request{{ stats.pending | pluralize }} waiting for review{% endblock subtitle %}
+{% block actions %}{{ <ui.button label="New request" href="/requests/new"/> }}{% endblock actions %}
+
+{% block content %}
+<div class="space-y-6" data-layer="page" data-page="dashboard">
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {{ <ui.stat label="Total requests" value={stats.total} hint={"$" ~ stats.amount_total ~ " requested"}/> }}
+    {{ <ui.stat label="Pending" value={stats.pending} hint={"$" ~ stats.amount_pending ~ " waiting"} tone="amber"/> }}
+    {{ <ui.stat label="Approved" value={stats.approved} hint={"$" ~ stats.amount_approved ~ " paid out"} tone="emerald"/> }}
+    {{ <ui.stat label="Approval rate" value={stats.approval_rate ~ "%"} hint="of the decided requests" tone="indigo"/> }}
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <div class="lg:col-span-2">
+      {% <ui.card title="Needs your review" subtitle="Largest first"> %}
+        {% if waiting %}
+        <ul class="divide-y divide-slate-100" data-list="waiting">
+          {% for r in waiting | sort(attribute="amount") | reverse %}
+          <li class="flex items-center justify-between gap-4 py-3">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium">{{ r.applicant }} <span class="font-normal text-slate-400">· {{ r.department }} · {{ r.category }}</span></p>
+              <p class="truncate text-xs text-slate-500">{{ r.reason | truncate(length=70) }}</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-3">
+              {% if r.urgent %}<span class="rounded bg-rose-100 px-1.5 text-xs font-semibold text-rose-700">Urgent</span>{% endif %}
+              <span class="text-sm font-semibold">${{ r.amount }}</span>
+              {{ <ui.button label="Review" href={"/requests/" ~ r.id} kind="ghost"/> }}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        {{ <ui.empty message="Nothing is waiting. Enjoy the quiet."/> }}
+        {% endif %}
+      {% </ui.card> %}
+    </div>
+
+    <div class="space-y-6">
+      {% <ui.card title="Decisions"> %}
+        <div class="space-y-4">
+          {{ <ui.bar label="Approved" value={stats.approved} max={stats.total} tone="emerald" note={stats.approved ~ " of " ~ stats.total}/> }}
+          {{ <ui.bar label="Rejected" value={stats.rejected} max={stats.total} tone="rose" note={stats.rejected ~ " of " ~ stats.total}/> }}
+          {{ <ui.bar label="Pending" value={stats.pending} max={stats.total} tone="amber" note={stats.pending ~ " of " ~ stats.total}/> }}
+        </div>
+      {% </ui.card> %}
+      {% <ui.card title="Latest activity"> %}
+        <ul class="space-y-3 text-sm" data-list="recent">
+          {% for r in recent %}
+          <li class="flex items-center justify-between"><a class="font-medium text-indigo-600 hover:underline" href="/requests/{{ r.id }}">#{{ r.id }} {{ r.applicant }}</a>{{ <ui.badge status={r.status}/> }}</li>
+          {% endfor %}
+        </ul>
+      {% </ui.card> %}
+    </div>
+  </div>
+</div>
+{% endblock content %}

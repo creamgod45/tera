@@ -1,0 +1,27 @@
+name: Tests
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        webTests: ['false', 'true']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: bash ./gradlew test buildPlugin -PwebTests=${{ matrix.webTests }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-web-${{ matrix.webTests }}
+          path: |
+            build/reports/tests/test/
+            build/test-results/test/
+            build/distributions/*.zip

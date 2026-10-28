@@ -1,0 +1,12 @@
+[package]
+name = "review-poc"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Standalone: not part of any workspace above this directory.
+[workspace]
+
+[dependencies]
+rocket = "0.5"
+tera = { version = "2.4", features = ["preserve_order"] }

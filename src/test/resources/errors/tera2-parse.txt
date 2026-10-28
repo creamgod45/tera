@@ -1,0 +1,5 @@
+error: Found `</` but expected }}.
+ --> pages/bad.html:3:9
+  |
+3 | <b>{{ y </b>
+  |         ^^

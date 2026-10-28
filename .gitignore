@@ -1,4 +1,5 @@
 .gradle
+.intellijPlatform/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
@@ -53,3 +54,11 @@ $RECYCLE.BIN/
 
 ### IntelliJ IDEA - local only ###
 .idea/kotlinc.xml
+
+### JVM heap dumps ###
+*.hprof
+
+### Rust verification tool build output ###
+tools/**/target/
+examples/**/target/
+examples/**/.idea/

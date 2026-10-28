@@ -1,0 +1,2 @@
+{% macro badge(label) %}{{ label | as_str }}{% endmacro %}
+{{ self::badge(label="x") }}

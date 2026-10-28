@@ -1,0 +1,57 @@
+{% extends "layouts/section.html" %}
+
+{% block subtitle %}{{ requests | length }} shown{% if status or department %} (filtered){% endif %}{% endblock subtitle %}
+{% block actions %}{{ <ui.button label="New request" href="/requests/new"/> }}{% endblock actions %}
+
+{% block content %}
+{% set tabs = [
+  {"label": "All", "value": "", "n": counts[0]},
+  {"label": "Pending", "value": "pending", "n": counts[1]},
+  {"label": "Approved", "value": "approved", "n": counts[2]},
+  {"label": "Rejected", "value": "rejected", "n": counts[3]}
+] %}
+<div class="space-y-4" data-layer="page" data-page="requests">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex gap-1 rounded-lg bg-slate-100 p-1" data-slot="tabs">
+      {% for t in tabs %}
+      <a href="/requests?status={{ t.value }}&department={{ department }}" data-tab="{{ t.label | lower }}"
+         class="rounded-md px-3 py-1.5 text-sm font-medium {{ 'bg-white shadow-sm' if t.value == status else 'text-slate-600 hover:text-slate-900' }}">{{ t.label }} <span class="text-slate-400">{{ t.n }}</span></a>
+      {% endfor %}
+    </div>
+    <form method="get" action="/requests" class="flex items-center gap-2">
+      <input type="hidden" name="status" value="{{ status }}">
+      <select name="department" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm" onchange="this.form.submit()">
+        <option value="">All departments</option>
+        {% for d in departments %}<option value="{{ d }}" {% if d == department %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+
+  {% if requests %}
+  {% set total = 0 %}
+  {% for r in requests %}{% set_global total = total + r.amount %}{% endfor %}
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <table class="min-w-full divide-y divide-slate-200 text-sm" data-table="requests">
+      <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <tr><th class="px-4 py-3">#</th><th class="px-4 py-3">Applicant</th><th class="px-4 py-3">Category</th><th class="px-4 py-3">Reason</th><th class="px-4 py-3 text-right">Amount</th><th class="px-4 py-3">Status</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for r in requests %}
+        <tr class="{{ 'bg-slate-50/60' if loop.index is odd else 'bg-white' }}" data-row="{{ r.id }}">
+          <td class="px-4 py-3 text-slate-400">{{ r.id }}</td>
+          <td class="px-4 py-3"><a class="font-medium text-indigo-600 hover:underline" href="/requests/{{ r.id }}">{{ r.applicant }}</a><p class="text-xs text-slate-400">{{ r.department }}</p></td>
+          <td class="px-4 py-3">{{ r.category }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ r.reason | truncate(length=44) }}{% if r.urgent %} <span class="font-semibold text-rose-600">!</span>{% endif %}</td>
+          <td class="px-4 py-3 text-right font-medium">${{ r.amount }}</td>
+          <td class="px-4 py-3">{{ <ui.badge status={r.status}/> }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="bg-slate-50 text-sm font-semibold"><tr><td class="px-4 py-3" colspan="4">Total of the {{ requests | length }} shown</td><td class="px-4 py-3 text-right" data-total="amount">${{ total }}</td><td></td></tr></tfoot>
+    </table>
+  </div>
+  {% else %}
+  {{ <ui.empty message="No request matches these filters."/> }}
+  {% endif %}
+</div>
+{% endblock content %}

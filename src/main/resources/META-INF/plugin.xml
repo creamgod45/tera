@@ -86,8 +86,25 @@
     ]]></description>
 
     <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.xml</depends>
+    <!-- Render context from Rust code (Template::render): RustRover / CLion, and IntelliJ IDEA's Rust plugin -->
+    <depends optional="true" config-file="tera-rust.xml">com.jetbrains.rust</depends>
+    <depends optional="true" config-file="tera-intellij-rust.xml">org.rust.lang</depends>
 
-<extensions defaultExtensionNs="com.intellij">
+<extensionPoints>
+        <extensionPoint qualifiedName="com.tera.contextProvider" interface="com.tera.tera.TeraContextProvider" dynamic="true"/>
+    </extensionPoints>
+
+<extensions defaultExtensionNs="com.tera">
+        <contextProvider implementation="com.tera.tera.TeraSchemaContextProvider"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <lang.ast.factory language="Tera" implementationClass="com.tera.tera.TeraAstFactory"/>
+        <lang.fileViewProviderFactory language="Tera"
+            implementationClass="com.tera.tera.TeraFileViewProviderFactory"/>
+        <editorHighlighterProvider filetype="Tera Template"
+            implementationClass="com.tera.tera.TeraEditorHighlighterProvider"/>
 
         <!-- 文件类型：关联 .tera 扩展名 -->
         <fileType name="Tera Template"
@@ -104,6 +121,94 @@
         <externalAnnotator language="Tera"
                             implementationClass="com.tera.tera.TeraExternalAnnotator"/>
 
+        <!-- 宏 / import 补全 -->
+        <completion.contributor language="any"
+                                implementationClass="com.tera.tera.TeraCompletionContributor"/>
+
+        <!-- 跳转到定义：宏、命名空间、参数、模板路径（多个来源时弹出列表） -->
+        <gotoDeclarationHandler implementation="com.tera.tera.TeraGotoDeclarationHandler"/>
+
+        <!-- From the Rust string that names a template (render("pages/x", ..)): open the template -->
+        <gotoDeclarationHandler implementation="com.tera.tera.TeraRustTemplateGotoHandler"/>
+        <codeInsight.lineMarkerProvider language="Rust"
+                                        implementationClass="com.tera.tera.TeraRustTemplateLineMarkerProvider"/>
+
+        <completion.contributor language="Rust"
+                                implementationClass="com.tera.tera.TeraRustTemplateCompletionContributor"/>
+
+        <!-- Editor basics: Cmd+/ comment, brace matching, auto-close, folding -->
+        <lang.commenter language="Tera" implementationClass="com.tera.tera.TeraCommenter"/>
+        <lang.braceMatcher language="Tera" implementationClass="com.tera.tera.TeraBraceMatcher"/>
+        <typedHandler implementation="com.tera.tera.TeraTypedHandler"/>
+        <backspaceHandlerDelegate implementation="com.tera.tera.TeraBackspaceHandler"/>
+        <lang.foldingBuilder language="Tera" implementationClass="com.tera.tera.TeraFoldingBuilder"/>
+
+        <!-- Template errors in the Run window become links -->
+        <consoleFilterProvider implementation="com.tera.tera.TeraConsoleFilterProvider"/>
+
+        <!-- Reformat Code: indentation by tag nesting, nothing else -->
+        <postFormatProcessor implementation="com.tera.tera.TeraPostFormatProcessor"/>
+
+        <!-- Live templates (Tab): common ones, and the ones for Tera 1 or Tera 2 only -->
+        <liveTemplateContext contextId="TERA" implementation="com.tera.tera.TeraTemplateContext"/>
+        <liveTemplateContext contextId="TERA_V1" baseContextId="TERA" implementation="com.tera.tera.TeraV1TemplateContext"/>
+        <liveTemplateContext contextId="TERA_V2" baseContextId="TERA" implementation="com.tera.tera.TeraV2TemplateContext"/>
+        <liveTemplateContext contextId="TERA_V2_EXPRESSION" implementation="com.tera.tera.TeraV2ExpressionContext"/>
+        <defaultLiveTemplates file="liveTemplates/Tera"/>
+
+        <!-- Find Usages and Rename of blocks, macros and variables -->
+        <lang.findUsagesProvider language="Tera" implementationClass="com.tera.tera.TeraFindUsagesProvider"/>
+        <lang.namesValidator language="Tera" implementationClass="com.tera.tera.TeraNamesValidator"/>
+        <renameHandler implementation="com.tera.tera.TeraComponentRenameHandler"/>
+        <referencesSearch implementation="com.tera.tera.TeraTemplateReferencesSearcher"/>
+        <renamePsiElementProcessor implementation="com.tera.tera.TeraRenameProcessor"/>
+        <targetElementEvaluator language="Tera" implementationClass="com.tera.tera.TeraTargetElementEvaluator"/>
+
+        <!-- Lists of usages and definitions show the line and file:line -->
+        <gotoTargetRendererProvider implementation="com.tera.tera.TeraGotoRendererProvider"/>
+        <gotoTargetPresentationProvider implementation="com.tera.tera.TeraGotoPresentationProvider"/>
+
+        <!-- Gutter: block overrides along the extends chain -->
+        <codeInsight.lineMarkerProvider language="Tera"
+                                        implementationClass="com.tera.tera.TeraBlockLineMarkerProvider"/>
+
+        <!-- Gutter: usages of a component on its definition, the definition on a call -->
+        <codeInsight.lineMarkerProvider language="Tera"
+                                        implementationClass="com.tera.tera.TeraComponentLineMarkerProvider"/>
+
+        <!-- 悬停 / Quick Documentation：宏签名、参数、说明注释 -->
+        <lang.documentationProvider language="Tera"
+                                    implementationClass="com.tera.tera.TeraDocumentationProvider"/>
+
+        <!-- Alt+Enter: migrate this template to Tera 2 -->
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraMigrateIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+
+        <!-- Alt+Enter on {{ list }}: loop over it / loop with a fallback / join it -->
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraIterateForIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraIterateForElseIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+        <intentionAction>
+            <language>Tera</language>
+            <className>com.tera.tera.TeraIterateJoinIntention</className>
+            <category>Tera</category>
+        </intentionAction>
+
+        <!-- Tera version (auto-detected from Cargo, overridable) -->
+        <projectService serviceImplementation="com.tera.tera.TeraSettings"/>
+        <projectConfigurable parentId="language" instance="com.tera.tera.TeraSettingsConfigurable"
+                             id="com.tera.tera.settings" displayName="Tera"/>
+
         <!-- 语法高亮工厂 -->
         <lang.syntaxHighlighterFactory language="Tera"
                                         implementationClass="com.tera.tera.TeraSyntaxHighlighterFactory"/>
@@ -116,4 +221,12 @@
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/TeraDarcula.xml"/>
 
     </extensions>
+
+    <actions>
+        <action id="Tera.MigrateAll" class="com.tera.tera.TeraMigrateAllAction"
+                text="Migrate Tera Templates to 2.x…"
+                description="Rewrite every Tera template in the project for Tera 2">
+            <add-to-group group-id="CodeMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

@@ -1,0 +1,128 @@
+<templateSet group="Tera">
+  <template name="xx" value="{{ $EXPR$ }}$END$" description="Print a value" toReformat="false" toShortenFQNames="true">
+    <variable name="EXPR" expression="" defaultValue="&quot;expr&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="block" value="{% block $NAME$ %}&#10;  $END$&#10;{% endblock $NAME$ %}" description="block" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="inblock" value="{% block $NAME$ %}$END${% endblock $NAME$ %}" description="block on one line" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="if" value="{% if $COND$ %}&#10;  $END$&#10;{% endif %}" description="if" toReformat="false" toShortenFQNames="true">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="ifi" value="{% if $COND$ %}$END${% endif %}" description="if on one line" toReformat="false" toShortenFQNames="true">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="ifelse" value="{% if $COND$ %}&#10;  $END$&#10;{% else %}&#10;  &#10;{% endif %}" description="if with else" toReformat="false" toShortenFQNames="true">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="elif" value="{% elif $COND$ %}" description="elif" toReformat="false" toShortenFQNames="true">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="else" value="{% else %}" description="else" toReformat="false" toShortenFQNames="true">
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="forloop" value="{% for $ITEM$ in $LIST$ %}&#10;  $END$&#10;{% endfor %}" description="for loop" toReformat="false" toShortenFQNames="true">
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true" />
+    <variable name="LIST" expression="" defaultValue="&quot;list&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="forkv" value="{% for $KEY$, $VALUE$ in $MAP$ %}&#10;  $END$&#10;{% endfor %}" description="for loop over a map" toReformat="false" toShortenFQNames="true">
+    <variable name="KEY" expression="" defaultValue="&quot;key&quot;" alwaysStopAt="true" />
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true" />
+    <variable name="MAP" expression="" defaultValue="&quot;map&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="forelse" value="{% for $ITEM$ in $LIST$ %}&#10;  $END$&#10;{% else %}&#10;  &#10;{% endfor %}" description="for loop with the empty case" toReformat="false" toShortenFQNames="true">
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true" />
+    <variable name="LIST" expression="" defaultValue="&quot;list&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="extend" value="{% extends &quot;$NAME$&quot; %}" description="extends" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;base.html&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="include" value="{% include &quot;$NAME$&quot; %}" description="include" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;partial.html&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="filter" value="{% filter $NAME$ %}&#10;  $END$&#10;{% endfilter %}" description="filter block" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;upper&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="raw" value="{% raw %}$END${% endraw %}" description="raw" toReformat="false" toShortenFQNames="true">
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="comment" value="{# $END$ #}" description="comment" toReformat="false" toShortenFQNames="true">
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="super" value="{{ super() }}" description="parent block content" toReformat="false" toShortenFQNames="true">
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="set" value="{% set $NAME$ = $VALUE$ %}" description="set a variable" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="setglobal" value="{% set_global $NAME$ = $VALUE$ %}" description="set a global variable" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true" />
+    <context><option name="TERA" value="true" /></context>
+  </template>
+  <template name="macro" value="{% macro $NAME$($ARGS$) %}&#10;  $END$&#10;{% endmacro $NAME$ %}" description="macro (Tera 1)" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <variable name="ARGS" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V1" value="true" /></context>
+  </template>
+  <template name="import" value="{% import &quot;$FILE$&quot; as $ALIAS$ %}" description="import macros (Tera 1)" toReformat="false" toShortenFQNames="true">
+    <variable name="FILE" expression="" defaultValue="&quot;macros.html&quot;" alwaysStopAt="true" />
+    <variable name="ALIAS" expression="" defaultValue="&quot;macros&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V1" value="true" /></context>
+  </template>
+  <template name="component" value="{% component $NAME$($PARAMS$) %}&#10;  $END$&#10;{% endcomponent %}" description="component (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;ui.name&quot;" alwaysStopAt="true" />
+    <variable name="PARAMS" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+  <template name="comp" value="{{ &lt;$NAME$ $ATTRS$/&gt; }}" description="component call (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;ui.name&quot;" alwaysStopAt="true" />
+    <variable name="ATTRS" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+  <template name="compbody" value="{% &lt;$NAME$ $ATTRS$&gt; %}&#10;  $END$&#10;{% &lt;/$NAME$&gt; %}" description="component call with a body (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;ui.name&quot;" alwaysStopAt="true" />
+    <variable name="ATTRS" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+  <template name="setblock" value="{% set $NAME$ %}&#10;  $END$&#10;{% endset %}" description="capture output in a variable (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+  <template name="ternary" value="{{ $A$ if $COND$ else $B$ }}" description="inline conditional (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <variable name="A" expression="" defaultValue="&quot;a&quot;" alwaysStopAt="true" />
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true" />
+    <variable name="B" expression="" defaultValue="&quot;b&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+  <template name="comprehension" value="[$EXPR$ for $ITEM$ in $LIST$ if $COND$]" description="list comprehension (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <variable name="EXPR" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true" />
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true" />
+    <variable name="LIST" expression="" defaultValue="&quot;list&quot;" alwaysStopAt="true" />
+    <variable name="COND" expression="" defaultValue="&quot;true&quot;" alwaysStopAt="true" />
+    <context><option name="TERA_V2_EXPRESSION" value="true" /></context>
+  </template>
+  <template name="break" value="{% break %}" description="break (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+  <template name="continue" value="{% continue %}" description="continue (Tera 2)" toReformat="false" toShortenFQNames="true">
+    <context><option name="TERA_V2" value="true" /></context>
+  </template>
+</templateSet>
