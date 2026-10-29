@@ -70,7 +70,7 @@ class TeraZolaTest : BasePlatformTestCase() {
         val existing = myFixture.findFileInTempDir(path)
         if (existing == null) return myFixture.addFileToProject(path, text)
         runWriteAction { com.intellij.openapi.vfs.VfsUtil.saveText(existing, text) }
-        return myFixture.psiManager.findFile(existing)!!
+        return myFixture.psiManager.findFile(existing) ?: error("No PSI file for $path")
     }
 
     private fun ctx(path: String, text: String) = TeraContexts.forFile(put(path, text))

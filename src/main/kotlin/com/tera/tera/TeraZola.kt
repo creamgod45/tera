@@ -263,7 +263,7 @@ object TeraZola {
                     found.getOrPut(m.groupValues[2]) { mutableSetOf() }.add(kind)
                 }
             }
-            CachedValueProvider.Result.create(found as Map<String, Set<Kind>>, PsiModificationTracker.MODIFICATION_COUNT)
+            CachedValueProvider.Result.create(found.mapValues { it.value.toSet() }, PsiModificationTracker.MODIFICATION_COUNT)
         }
 
     /** The kinds [name] (relative to `templates/`) is rendered for, or none when that is not known. */
