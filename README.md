@@ -301,6 +301,13 @@ recognised without opening it.
   shells such as `Page<T>` with `#[serde(flatten)]`, `let ctx = page(..)` locals and Rocket's `form::Context`.
   Layouts and partials are never rendered directly, so they get the variables of every page that extends or includes them.
 
+### Zola sites
+
+Zola renders `templates/*.html` with Tera. Register `*.html` under Settings → Editor → File Types → Tera Template and set
+the Tera version; in a project with a `zola.toml` the plugin then knows Zola's functions, filters and template variables
+(`page`, `section`, `term`, `config`, …) and finds components defined in `.html` files. See `docs/USER-GUIDE.md`, section
+14, and `examples/Zola`.
+
 ## Example: a request, review and statistics app
 
 `examples/review-poc` is a Rocket + Tera 2 application with a four-level layout, an eleven-component library and a

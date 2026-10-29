@@ -184,5 +184,39 @@ template roots. The Run tool window is covered; the Terminal tool window is not.
 
 Diagnostics are structural checks, not a Tera runtime. Rust discovery is static: values built at run time (maps filled
 in a loop, `serde_json::Value`) are unknown, and templates added with `add_raw_template` have no file. Not done yet:
-Zola-specific variables, a block-level hover, Alt+F7 for dotted component names, bold match highlighting in usage lists,
+A block-level hover, Alt+F7 for dotted component names, bold match highlighting in usage lists,
 template paths produced by `macro_rules!`. `MANUAL-CHECK.md` lists what a person should try in the IDE.
+
+## 14. Zola sites
+
+[Zola](https://www.getzola.org/) renders `templates/*.html` with Tera, but the plugin only opens `.tera` files by
+default. Tell the IDE that your `.html` files are Tera templates:
+
+1. **Settings → Editor → File Types → Tera Template → +** (Registered Patterns), add `*.html`.
+2. Open a template under `templates/`. The `{{ }}` and `{% %}` are highlighted, and HTML, CSS and JavaScript around them
+   keep working.
+3. A Zola site has no `Cargo.toml`, so the Tera version falls back to 2.x, which is right for Zola 0.23 and later. For an
+   older Zola (Tera 1) set **Settings → Languages & Frameworks → Tera → Tera version** to 1.x.
+
+The pattern covers every `.html` file of the project, not just `templates/`, which suits a site that is only Zola. Keep a
+project that also has plain HTML pages in a separate IDE project, or accept that those are highlighted as Tera too.
+
+Once `zola.toml` (or an older `config.toml` next to `content/` and `templates/`) is in the project, the plugin adds:
+
+- **Components in `.html` files**: a `{% component post_card(page) %}` in `macros.html` is found from every template,
+  with completion, hover, go to definition and rename.
+- **Zola functions and filters**: `get_url`, `get_page`, `get_section`, `get_taxonomy`, `get_taxonomy_term`,
+  `get_taxonomy_url`, `get_hash`, `get_image_metadata`, `resize_image`, `load_data`, `trans`, and the filters `markdown`,
+  `regex_replace`, `num_format`, `base64_encode`, `base64_decode`.
+- **Filters Zola still provides**: `date`, `striptags`, `slugify`, `urlencode`, `json_encode`, `filesizeformat`, `spaceless`,
+  `matching`, `now` and `get_random` are not reported as removed in Tera 2.
+- **Variables**, per kind of template: `page` in `page.html`; `section` and `paginator` in `section.html` and `index.html`;
+  `taxonomy`, `terms` and `term` in `<taxonomy>/list.html` and `single.html` (the taxonomy must be named in `zola.toml`);
+  `config`, `lang` and `zola_version` everywhere; `current_path` and `current_url` everywhere but `404.html`. They have
+  completion, hover and warnings for a misspelled field (`page.titl`). `extra` and `config.extra` accept any field.
+- **Custom templates**: a template named by `template = "project.html"` (or `page_template`) in a Markdown front matter gets
+  the variables of a page (a section for an `_index.md`). `base.html` and partials get those of the templates that extend
+  or include them. A template whose use cannot be told is not checked.
+
+Shortcodes were removed in Zola 0.23; write them as components and call them as `{{ <callout kind="note"/> }}`. Tera syntax
+inside Markdown content has to be wrapped in `{% raw %}`. `examples/Zola` is a complete site that uses all of this.
