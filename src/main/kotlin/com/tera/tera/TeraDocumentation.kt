@@ -287,6 +287,41 @@ object TeraDocumentation {
         return sb.toString()
     }
 
+    fun comprehensionHtml(ref: TeraVariables.ComprehensionRef): String {
+        val c = ref.comp
+        val sb = StringBuilder()
+        val form = if (c.isMap) "{ key: value for k, v in map if condition }" else "[ expression for x in items if condition ]"
+        when (ref.part) {
+            "variable" -> {
+                val shown = ref.varType?.display()?.let { ": $it" }.orEmpty()
+                sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>(comprehension variable) ")
+                    .append(esc(ref.token.text)).append(esc(shown)).append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+                sb.append(DocumentationMarkup.CONTENT_START)
+                    .append("Bound by the comprehension, one item of <code>${esc(ref.source)}</code> at a time. ")
+                    .append("It exists only between the ${if (c.isMap) "braces" else "brackets"}; outside them the name is not defined.")
+                    .append(DocumentationMarkup.CONTENT_END)
+            }
+            else -> {
+                sb.append(DocumentationMarkup.DEFINITION_START).append("<pre>")
+                    .append(esc(if (c.isMap) "{ ${ref.element} for ${c.vars.joinToString(", ") { it.text }} in ${ref.source} }"
+                    else "[ ${ref.element} for ${c.vars.joinToString(", ") { it.text }} in ${ref.source} ]"))
+                    .append("</pre>").append(DocumentationMarkup.DEFINITION_END)
+                sb.append(DocumentationMarkup.CONTENT_START)
+                    .append("Tera 2 comprehension: builds a new ${if (c.isMap) "map" else "list"} from another collection, in one expression.")
+                    .append(DocumentationMarkup.CONTENT_END)
+            }
+        }
+        sb.append(DocumentationMarkup.SECTIONS_START)
+        section(sb, "Form:", "<code>${esc(form)}</code>")
+        if (ref.part != "variable") {
+            ref.sourceType?.let { section(sb, "Loops over:", "<code>${esc(it.display())}</code>") }
+            section(sb, "Result:", if (c.isMap) "a map" else "a list")
+        }
+        section(sb, "Not the same as:", "<code>{% for %}</code>, a statement that prints or sets nothing by itself; a comprehension is a value you can pipe, e.g. <code>[x.a for x in xs] | sort | last</code>")
+        sb.append(DocumentationMarkup.SECTIONS_END)
+        return sb.toString()
+    }
+
     /** [templates]: file name, its text and macros, for every template the import path resolves to. */
     fun importHtml(imp: ImportDecl, templates: List<Triple<String, String, List<MacroDef>>>): String {
         val sb = StringBuilder()
@@ -320,6 +355,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         class Import(val imp: ImportDecl) : Described
         class Variable(val ref: TeraVariables.Ref, val context: TeraContextResult?) : Described
         class Builtin(val ref: BuiltinRef) : Described
+        class Comprehension(val ref: TeraVariables.ComprehensionRef) : Described
         class Component(val def: ComponentDef) : Described
         class ComponentAttribute(val def: ComponentDef, val param: ComponentParam) : Described
     }
@@ -341,6 +377,8 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
         TeraBuiltinRefs.at(file.text, offset, TeraContexts.customBuiltins(file.project), versionOf(file))?.takeIf { it.token.range.startOffset == offset }
             ?.let { return Described.Builtin(it) }
         val context = TeraContexts.forFile(file)
+        TeraVariables.comprehensionAt(file.text, offset, context, versionOf(file))?.takeIf { it.token.range.startOffset == offset }
+            ?.let { return Described.Comprehension(it) }
         TeraVariables.refAt(file.text, offset, context, versionOf(file))?.takeIf { it.range.startOffset == offset }
             ?.let { return Described.Variable(it, context) }
         return null
@@ -375,6 +413,10 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
 
         // Hovering a built-in function, filter or test.
         TeraBuiltinRefs.at(here.text, targetOffset, TeraContexts.customBuiltins(file.project), versionOf(file))?.let { return here.findElementAt(it.token.range.startOffset) }
+
+        // Hovering part of a comprehension: its brackets, `for`/`in`, or a variable it binds.
+        TeraVariables.comprehensionAt(here.text, targetOffset, TeraContexts.forFile(file), versionOf(file))
+            ?.let { return here.findElementAt(it.token.range.startOffset) }
 
         // Hovering a variable use.
         TeraVariables.refAt(here.text, targetOffset, TeraContexts.forFile(file), versionOf(file))
@@ -412,6 +454,7 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             }
             is Described.Variable -> TeraDocumentation.variableHtml(d.ref, d.context)
             is Described.Builtin -> TeraDocumentation.builtinHtml(d.ref)
+            is Described.Comprehension -> TeraDocumentation.comprehensionHtml(d.ref)
             is Described.Component -> TeraDocumentation.componentHtml(text, d.def, file.name)
             is Described.ComponentAttribute -> TeraDocumentation.componentAttributeHtml(text, d.def, d.param, file.name)
             null -> null
@@ -430,6 +473,8 @@ class TeraDocumentationProvider : AbstractDocumentationProvider() {
             }
             is Described.Import -> "import \"${d.imp.path}\" as ${d.imp.alias}"
             is Described.Builtin -> "(${d.ref.kind}) ${d.ref.def.signature()}"
+            is Described.Comprehension -> if (d.ref.part == "variable") "(comprehension variable) ${d.ref.token.text}" +
+                (d.ref.varType?.display()?.let { ": $it" }.orEmpty()) else "comprehension over ${d.ref.source}"
             is Described.Component -> "${file.name}: component ${d.def.signature()}"
             is Described.ComponentAttribute -> "${file.name}: ${d.def.name}(${d.param.name}${d.param.type?.let { ": $it" }.orEmpty()})"
             is Described.Variable -> "(variable) ${d.ref.occurrence.segs[d.ref.index].name}: " +

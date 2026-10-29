@@ -5,8 +5,15 @@ pull request 1 into `dev`); commits are given by their short hash.
 
 ## 1.3.0
 
+### Documentation
+
+- Hovering a Tera 2 comprehension explains it: the brackets and `for`/`in` show the form, what it loops over and its
+  result; a variable it binds shows its type and that it only exists inside the brackets.
+
 ### Correctness
 
+- Variables bound by a Tera 2 comprehension (`[d.amount for d in xs]`) are no longer reported as undefined
+  (`4b24e01`).
 - No false errors for whitespace-trimming delimiters (`{%-`, `-%}`, `{{-`, `-}}`) or named end tags
   (`{% endmacro name %}`, `{% endblock name %}`) (`cbd7787`).
 - HTML, CSS and JavaScript inside a template are parsed and highlighted by the native template data language support

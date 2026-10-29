@@ -46,10 +46,11 @@ object TeraVariables {
                     .let { if (it < 0) continue else it + 1 }
                 else -> continue
             }
+            val bound = comprehensionScopes(t)
             var i = from
             while (i < t.size) {
                 val tok = t[i]
-                if (!isName(tok) || !startsPath(t, i) || componentNames.any { tok.range.startOffset >= it.startOffset && tok.range.endOffset <= it.endOffset }) { i++; continue }
+                if (!isName(tok) || !startsPath(t, i) || bound.any { tok.text in it.names && i in it.range } || componentNames.any { tok.range.startOffset >= it.startOffset && tok.range.endOffset <= it.endOffset }) { i++; continue }
                 val segs = mutableListOf(PathSeg(tok.text))
                 val toks = mutableListOf(tok)
                 var j = i + 1
@@ -78,6 +79,63 @@ object TeraVariables {
         }
         return result
     }
+
+    /**
+     * A Tera 2 comprehension (`[x.a for x in xs if x.ok]`, `{k: v for k, v in m}`) inside one block.
+     * [vars] are the names it binds, valid between [open] and [close] only; [tokens] is the block's list
+     * and [range] the indexes of [open]..[close] in it.
+     */
+    class Comprehension(
+        val tokens: List<TeraTok>,
+        val range: IntRange,
+        val forIndex: Int,
+        val inIndex: Int,
+        val vars: List<TeraTok>,
+    ) {
+        val open: TeraTok get() = tokens[range.first]
+        val forTok: TeraTok get() = tokens[forIndex]
+        val inTok: TeraTok get() = tokens[inIndex]
+        val isMap: Boolean get() = open.text == "{"
+        val names: Set<String> get() = vars.map { it.text }.toSet()
+
+        fun element(text: String): String =
+            text.substring(open.range.endOffset, forTok.range.startOffset).trim()
+
+        /** What is looped over: from after `in` up to a trailing `if` or the closing bracket. */
+        fun source(text: String): String {
+            val end = (inIndex + 1..range.last).firstOrNull { it == range.last || (tokens[it].type == TeraTokenTypes.KEYWORD && tokens[it].text == "if") }
+                ?: range.last
+            val to = if (end >= tokens.size) text.length else tokens[end].range.startOffset
+            return text.substring(inTok.range.endOffset, to).trim()
+        }
+    }
+
+    private fun isOpen(t: TeraTok) = t.type == TeraTokenTypes.OPERATOR && t.text in setOf("[", "(", "{")
+    private fun isClose(t: TeraTok) = t.type == TeraTokenTypes.OPERATOR && t.text in setOf("]", ")", "}")
+
+    fun comprehensions(t: List<TeraTok>): List<Comprehension> {
+        val closeOf = mutableMapOf<Int, Int>()
+        val open = ArrayDeque<Int>()
+        for ((i, tok) in t.withIndex()) {
+            if (isOpen(tok)) open.addLast(i) else if (isClose(tok)) open.removeLastOrNull()?.let { closeOf[it] = i }
+        }
+        val result = mutableListOf<Comprehension>()
+        val stack = ArrayDeque<Int>()
+        for ((i, tok) in t.withIndex()) {
+            if (isOpen(tok)) stack.addLast(i)
+            else if (isClose(tok)) stack.removeLastOrNull()
+            else if (tok.type == TeraTokenTypes.KEYWORD && tok.text == "for" && stack.isNotEmpty()) {
+                val inAt = (i + 1 until t.size).firstOrNull { t[it].type == TeraTokenTypes.KEYWORD && t[it].text == "in" } ?: continue
+                val vars = (i + 1 until inAt).filter { isName(t[it]) }.map { t[it] }
+                val start = stack.last()
+                if (t[start].text == "(") continue
+                result.add(Comprehension(t, start..(closeOf[start] ?: (t.size - 1)), i, inAt, vars))
+            }
+        }
+        return result
+    }
+
+    private fun comprehensionScopes(t: List<TeraTok>) = comprehensions(t)
 
     /** True when the name at [i] is a variable reference, not a filter/test/kwarg/namespace/member name. */
     private fun startsPath(t: List<TeraTok>, i: Int): Boolean {
@@ -134,6 +192,53 @@ object TeraVariables {
             val r = occ.resolve(idx, context)
             if (r.failedAt >= 0) return null
             return Ref(occ, idx, r, occ.tokens[idx].range)
+        }
+        return null
+    }
+
+    /** What hovering part of a comprehension refers to; [part] is "keyword", "variable" or "bracket". */
+    class ComprehensionRef(
+        val comp: Comprehension,
+        val part: String,
+        val token: TeraTok,
+        val element: String,
+        val source: String,
+        val sourceType: TeraType?,
+        /** Type of [token] when it is one of the bound variables and the source type is known. */
+        val varType: TeraType?,
+    )
+
+    fun comprehensionAt(text: String, offset: Int, context: TeraContextResult?, version: TeraVersion): ComprehensionRef? {
+        if (version != TeraVersion.V2) return null
+        val blocks = TeraSymbolScanner.scanBlocks(text)
+        for ((bi, block) in blocks.withIndex()) {
+            val t = block.tokens
+            val idx = t.indexOfFirst { offset in it.range.startOffset..it.range.endOffset && it.type != TeraTokenTypes.OPERATOR || (it.type == TeraTokenTypes.OPERATOR && offset in it.range.startOffset until it.range.endOffset) }
+            if (idx < 0) continue
+            val comp = comprehensions(t).filter { idx in it.range }.minByOrNull { it.range.last - it.range.first } ?: continue
+            val tok = t[idx]
+            val part = when {
+                idx == comp.forIndex || idx == comp.inIndex -> "keyword"
+                idx == comp.range.first -> "bracket"
+                isName(tok) && tok.text in comp.names -> "variable"
+                else -> continue
+            }
+            var sourceType: TeraType? = null
+            if (context != null) {
+                val occ = collect(blocks, TeraScopes.snapshots(blocks, context, version, text))
+                    .firstOrNull { it.blockIndex == bi && it.tokens[0].range == t.getOrNull(comp.inIndex + 1)?.range }
+                occ?.resolve(occ.segs.size - 1, context)?.takeIf { it.failedAt < 0 }?.let { sourceType = it.type }
+            }
+            val varType = if (part != "variable") null else {
+                val n = comp.vars.indexOfFirst { it.text == tok.text }
+                val st = sourceType
+                when {
+                    st is TeraType.ArrayOf && comp.vars.size == 1 -> st.element
+                    st is TeraType.MapOf && comp.vars.size == 2 -> if (n == 0) TeraType.Scalar("string") else st.value
+                    else -> null
+                }
+            }
+            return ComprehensionRef(comp, part, tok, comp.element(text), comp.source(text), sourceType, varType)
         }
         return null
     }

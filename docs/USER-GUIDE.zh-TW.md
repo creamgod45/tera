@@ -11,6 +11,8 @@
 2. 在 IDE 裡：**Settings → Plugins → ⚙ → Install Plugin from Disk…**，選擇 ZIP，然後重啟 IDE。
 3. 本機建置的外掛會覆蓋同 ID（`com.tera.tera`）的已安裝外掛。兩次本機建置的版本號可能相同，所以安裝後請完整重啟 IDE。
 
+**另一個 Tera 外掛**：本外掛宣告與原本的 `Tera` 外掛（`com.tera.tera`）不相容，因為兩者都註冊 `.tera` 檔案類型。兩者同時安裝時，IDE 會在 **Settings → Plugins** 回報衝突；請移除或停用其中一個，然後重啟。
+
 **適用的 IDE**：任何有 HTML 支援的 JetBrains IDE。凡是牽涉 Rust 的功能（從結構體取得變數、Rust 字串中的模板名稱、在 Rust
 程式碼裡重新命名模板）都需要 RustRover，或安裝了 Rust 外掛的 CLion／IntelliJ IDEA。
 
