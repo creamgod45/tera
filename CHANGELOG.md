@@ -20,6 +20,8 @@ pull request 1 into `dev`); commits are given by their short hash.
   A template named by `template =` or `page_template =` in a Markdown front matter is treated the same way. `extra` and
   `config.extra` stay open. Fields are the ones Zola 0.23.6 passes (`{{ __tera_context }}`).
 
+## 1.3.0
+
 ### Documentation
 
 - Hovering a Tera 2 comprehension explains it: the brackets and `for`/`in` show the form, what it loops over and its
@@ -29,11 +31,6 @@ pull request 1 into `dev`); commits are given by their short hash.
 
 - Variables bound by a Tera 2 comprehension (`[d.amount for d in xs]`) are no longer reported as undefined
   (`4b24e01`).
-
-## 1.3.0
-
-### Correctness
-
 - No false errors for whitespace-trimming delimiters (`{%-`, `-%}`, `{{-`, `-}}`) or named end tags
   (`{% endmacro name %}`, `{% endblock name %}`) (`cbd7787`).
 - HTML, CSS and JavaScript inside a template are parsed and highlighted by the native template data language support

@@ -69,20 +69,18 @@ intellijPlatform {
         changeNotes = """
             <h3>1.3.1</h3>
             <ul>
-              <li><b>Zola sites</b>: components in <code>.html</code> templates are found; Zola's functions and filters (<code>get_url</code>, <code>get_section</code>, <code>markdown</code>, …) are known; <code>page</code>, <code>section</code>, <code>term</code> and <code>config</code> have completion, hover and typo warnings.</li>
-              <li><b>Comprehensions explained</b>: hover <code>for</code>, <code>in</code> or the bound variable in a Tera 2 <code>[x for x in xs]</code>.</li>
-              <li><b>Fixed</b>: comprehension variables are no longer reported as "not defined".</li>
+              <li><b>Zola sites</b>: components defined in <code>.html</code> templates are found, no more "Unknown component".</li>
+              <li><b>Zola functions and filters</b> (<code>get_url</code>, <code>get_section</code>, <code>markdown</code>, …) are known, and <code>date</code> or <code>striptags</code> are no longer reported as removed.</li>
+              <li><b>Zola variables</b>: <code>page</code>, <code>section</code>, <code>term</code> and <code>config</code> have completion, hover and typo warnings.</li>
             </ul>
-            <p>Zola: register <code>*.html</code> under Settings → Editor → File Types → Tera Template. See the user guide.</p>
-            <p>Works alone: disable or uninstall the original "Tera" plugin first (both use <code>.tera</code>).</p>
+            <p>Register <code>*.html</code> under Settings → Editor → File Types → Tera Template to use it in a Zola site.</p>
             <hr/>
             <ul>
-              <li><b>支援 Zola 網站</b>：找得到 <code>.html</code> 模板裡的元件；認得 Zola 的函式與 filter（<code>get_url</code>、<code>get_section</code>、<code>markdown</code>……）；<code>page</code>、<code>section</code>、<code>term</code>、<code>config</code> 有補全、懸停說明與拼字警告。</li>
-              <li><b>推導式說明</b>：在 Tera 2 的 <code>[x for x in xs]</code> 上懸停 <code>for</code>、<code>in</code> 或綁定的變數。</li>
-              <li><b>修正</b>：推導式的變數不再被報為「未定義」。</li>
+              <li><b>Zola 網站</b>：找得到 <code>.html</code> 模板裡定義的元件，不再顯示「Unknown component」。</li>
+              <li><b>Zola 函式與 filter</b>（<code>get_url</code>、<code>get_section</code>、<code>markdown</code>……）可辨識，<code>date</code>、<code>striptags</code> 不再被標為已移除。</li>
+              <li><b>Zola 變數</b>：<code>page</code>、<code>section</code>、<code>term</code>、<code>config</code> 有補全、懸停說明與拼字警告。</li>
             </ul>
-            <p>Zola 請在 Settings → Editor → File Types → Tera Template 加入 <code>*.html</code>，詳見使用者手冊。</p>
-            <p>請先停用或移除原本的「Tera」外掛（兩者都使用 <code>.tera</code>）。</p>
+            <p>在 Zola 網站使用請到 Settings → Editor → File Types → Tera Template 加入 <code>*.html</code>。</p>
         """.trimIndent()
     }
 }
