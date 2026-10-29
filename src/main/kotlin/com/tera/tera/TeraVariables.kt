@@ -46,10 +46,11 @@ object TeraVariables {
                     .let { if (it < 0) continue else it + 1 }
                 else -> continue
             }
+            val bound = comprehensionScopes(t)
             var i = from
             while (i < t.size) {
                 val tok = t[i]
-                if (!isName(tok) || !startsPath(t, i) || componentNames.any { tok.range.startOffset >= it.startOffset && tok.range.endOffset <= it.endOffset }) { i++; continue }
+                if (!isName(tok) || !startsPath(t, i) || bound.any { tok.text in it.names && i in it.range } || componentNames.any { tok.range.startOffset >= it.startOffset && tok.range.endOffset <= it.endOffset }) { i++; continue }
                 val segs = mutableListOf(PathSeg(tok.text))
                 val toks = mutableListOf(tok)
                 var j = i + 1
@@ -74,6 +75,33 @@ object TeraVariables {
                     result.add(VarOccurrence(snapshots[bi], toks, segs, optional, bi))
                 }
                 i = j
+            }
+        }
+        return result
+    }
+
+    /** Names bound by a Tera 2 comprehension (`[x.a for x in xs]`), valid inside its brackets only. */
+    private class Bound(val names: Set<String>, val range: IntRange)
+
+    private fun isOpen(t: TeraTok) = t.type == TeraTokenTypes.OPERATOR && t.text in setOf("[", "(", "{")
+    private fun isClose(t: TeraTok) = t.type == TeraTokenTypes.OPERATOR && t.text in setOf("]", ")", "}")
+
+    private fun comprehensionScopes(t: List<TeraTok>): List<Bound> {
+        val closeOf = mutableMapOf<Int, Int>()
+        val open = ArrayDeque<Int>()
+        for ((i, tok) in t.withIndex()) {
+            if (isOpen(tok)) open.addLast(i) else if (isClose(tok)) open.removeLastOrNull()?.let { closeOf[it] = i }
+        }
+        val result = mutableListOf<Bound>()
+        val stack = ArrayDeque<Int>()
+        for ((i, tok) in t.withIndex()) {
+            if (isOpen(tok)) stack.addLast(i)
+            else if (isClose(tok)) stack.removeLastOrNull()
+            else if (tok.type == TeraTokenTypes.KEYWORD && tok.text == "for" && stack.isNotEmpty()) {
+                val inAt = (i + 1 until t.size).firstOrNull { t[it].type == TeraTokenTypes.KEYWORD && t[it].text == "in" } ?: continue
+                val names = (i + 1 until inAt).filter { isName(t[it]) }.map { t[it].text }.toSet()
+                val start = stack.last()
+                result.add(Bound(names, start..(closeOf[start] ?: (t.size - 1))))
             }
         }
         return result

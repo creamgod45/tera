@@ -382,4 +382,12 @@ class TeraContextTest : BasePlatformTestCase() {
         assertEquals("  macros", displayTail("macros"))
         assertEquals("  already", displayTail("  already"))
     }
+
+    // ── Tera 2 comprehensions bind their own variable ────────────────────────
+
+    fun testComprehensionVariableIsNotUndefined() {
+        val src = "{% set m = [t.id for t in tasks] | sort | last %}{% set n = {k: v.id for k, v in tasks} %}"
+        assertEmpty(check(src))
+        assertEquals(1, check("{% set m = [t.id for t in tasks] %}{{ t }}").size)
+    }
 }
