@@ -5,6 +5,21 @@ pull request 1 into `dev`); commits are given by their short hash.
 
 ## 1.3.0
 
+### Zola
+
+- Components defined in templates the IDE maps to Tera (a Zola site's `.html` files) are found from every other template,
+  so `<post_card/>` is no longer "Unknown component".
+- In a Zola site (`zola.toml`, or `config.toml` next to `content/` and `templates/`), Zola's own functions and filters are
+  known: `get_url`, `get_section`, `get_page`, `get_taxonomy*`, `get_hash`, `get_image_metadata`, `resize_image`,
+  `load_data`, `trans`, `markdown`, `regex_replace`, `num_format`, `base64_*`, with completion and hover.
+- `date`, `striptags`, `slugify`, `urlencode`, `json_encode`, `now` and the others Plain Tera 2 moved to tera-contrib are not
+  reported as removed in a Zola site, which still provides them (checked against Zola 0.23.6).
+- The variables Zola gives a template, with completion, hover and "not defined" and misspelled-field warnings:
+  `page` in `page.html`, `section` (and `paginator`) in `section.html` and `index.html`, `taxonomy`, `terms` and `term` in
+  `<taxonomy>/list.html` and `single.html`, `config`, `lang`, `current_path`, `current_url` and `zola_version` everywhere.
+  A template named by `template =` or `page_template =` in a Markdown front matter is treated the same way. `extra` and
+  `config.extra` stay open. Fields are the ones Zola 0.23.6 passes (`{{ __tera_context }}`).
+
 ### Documentation
 
 - Hovering a Tera 2 comprehension explains it: the brackets and `for`/`in` show the form, what it loops over and its
@@ -110,5 +125,5 @@ pull request 1 into `dev`); commits are given by their short hash.
 
 ### Known gaps
 
-- Zola awareness (variables of `page`, `section`, `config`), a block-level hover, Alt+F7 for dotted component names,
+- A block-level hover, Alt+F7 for dotted component names,
   bold highlighting of the matched name in usage lists, template paths produced by `macro_rules!`.

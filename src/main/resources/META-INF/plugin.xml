@@ -75,6 +75,7 @@
 
 <extensions defaultExtensionNs="com.tera">
         <contextProvider implementation="com.tera.tera.TeraSchemaContextProvider"/>
+        <contextProvider implementation="com.tera.tera.TeraZolaContextProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
