@@ -3,7 +3,7 @@
 All notable changes to the Tera plugin. The first section is this branch (`codex/fix-tera-trimming-and-named-closers`,
 pull request 1 into `dev`); commits are given by their short hash.
 
-## 1.3.0
+## 1.3.1
 
 ### Zola
 
@@ -29,6 +29,11 @@ pull request 1 into `dev`); commits are given by their short hash.
 
 - Variables bound by a Tera 2 comprehension (`[d.amount for d in xs]`) are no longer reported as undefined
   (`4b24e01`).
+
+## 1.3.0
+
+### Correctness
+
 - No false errors for whitespace-trimming delimiters (`{%-`, `-%}`, `{{-`, `-}}`) or named end tags
   (`{% endmacro name %}`, `{% endblock name %}`) (`cbd7787`).
 - HTML, CSS and JavaScript inside a template are parsed and highlighted by the native template data language support
