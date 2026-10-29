@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} · {{ config.title }}{% endblock title %}
+{% block content %}
+<article class="post">
+  <header class="post-head"><h1>{{ page.title }}</h1><p class="lead">{{ page.description }}</p></header>
+  <div class="prose">{{ page.content | safe }}</div>
+
+  <h2 class="section-title">技能</h2>
+  <div class="grid">
+    {% for skill in page.extra.skills %}
+      <div class="card"><h3 class="card-title">{{ skill.name }}</h3><p class="card-text">{{ skill.note }}</p><span class="pill pill-{{ skill.level }}">{{ skill.level }}</span></div>
+    {% endfor %}
+  </div>
+
+  <h2 class="section-title">時間軸</h2>
+  <ol class="timeline">
+    {% for step in page.extra.timeline %}
+      <li><strong>{{ step.year }}</strong><span>{{ step.text }}</span></li>
+    {% endfor %}
+  </ol>
+</article>
+{% endblock content %}

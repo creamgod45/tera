@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} · {{ config.title }}{% endblock title %}
+{% block description %}{{ section.description }}{% endblock description %}
+
+{% block content %}
+<header class="page-head">
+  <h1>{{ section.title }}</h1>
+  <p class="lead">{{ section.extra.lead }}</p>
+</header>
+
+<div class="list">
+  {% for page in paginator.pages %}
+    {{ <post_card page={page}/> }}
+  {% endfor %}
+</div>
+{{ <pager paginator={paginator}/> }}
+{% endblock content %}

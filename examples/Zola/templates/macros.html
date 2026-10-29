@@ -1,0 +1,43 @@
+{# Components are global in Tera 2: nothing to import. #}
+
+{% component tag_list(page) %}
+  {% if page.taxonomies.tags is defined %}
+    <ul class="tags">
+      {% for tag in page.taxonomies.tags %}
+        <li><a href="{{ get_taxonomy_url(kind="tags", term=tag) | safe }}">#{{ tag }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endcomponent tag_list %}
+
+{% component post_card(page) %}
+  <article class="card">
+    <div class="card-meta">
+      <time datetime="{{ page.date }}">{{ page.date | date(format="%Y-%m-%d") }}</time>
+      <span>·</span>
+      <span>{{ page.reading_time }} 分鐘</span>
+      {% if page.extra.series is defined %}<span class="pill">{{ page.extra.series }} #{{ page.extra.series_part }}</span>{% endif %}
+    </div>
+    <h3 class="card-title"><a href="{{ page.permalink | safe }}">{{ page.title }}</a></h3>
+    <p class="card-text">{% if page.description %}{{ page.description }}{% else %}{{ page.summary | striptags | truncate(length=120) }}{% endif %}</p>
+    {{ <tag_list page={page}/> }}
+  </article>
+{% endcomponent post_card %}
+
+{% component pager(paginator) %}
+  {% if paginator.number_pagers > 1 %}
+    <nav class="pager" aria-label="Pagination">
+      {% if paginator.previous %}<a class="btn" href="{{ paginator.previous | safe }}">← 較新</a>{% else %}<span></span>{% endif %}
+      <span class="pager-count">{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+      {% if paginator.next %}<a class="btn" href="{{ paginator.next | safe }}">較舊 →</a>{% else %}<span></span>{% endif %}
+    </nav>
+  {% endif %}
+{% endcomponent pager %}
+
+{# A highlighted note; the content is the body. Used from Markdown: {% <callout kind="tip"> %}…{% </callout> %} #}
+{% component callout(kind = "note", title = "Note") %}
+<aside class="callout callout-{{ kind }}">
+  <p class="callout-title">{{ title }}</p>
+  {{ body }}
+</aside>
+{% endcomponent callout %}

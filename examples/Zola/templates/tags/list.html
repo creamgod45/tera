@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-head"><h1>標籤</h1></header>
+<ul class="cloud">
+  {% for term in terms %}
+    <li><a href="{{ term.permalink | safe }}">#{{ term.name }} <span>{{ term.pages | length }}</span></a></li>
+  {% endfor %}
+</ul>
+{% endblock content %}

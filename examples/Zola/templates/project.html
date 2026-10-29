@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} · {{ config.title }}{% endblock title %}
+{% block content %}
+<article class="post">
+  <header class="post-head">
+    <p class="eyebrow"><a href="{{ get_url(path="@/projects/_index.md") | safe }}">← Projects</a></p>
+    <h1>{{ page.title }}</h1>
+    <p class="lead">{{ page.description }}</p>
+    <p><a class="btn btn-primary" href="{{ page.extra.link }}">開啟專案</a></p>
+  </header>
+  <div class="prose">{{ page.content | safe }}</div>
+</article>
+{% endblock content %}

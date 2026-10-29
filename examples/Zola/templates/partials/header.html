@@ -1,0 +1,17 @@
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="{{ get_url(path="@/_index.md") | safe }}">
+      <span class="brand-mark">&lt;/&gt;</span>
+      <span class="brand-name">{{ config.title }}</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      {% for item in config.extra.nav %}
+        <a href="{{ get_url(path=item.url) | safe }}">{{ item.name }}</a>
+      {% endfor %}
+      <a href="{{ get_taxonomy_url(kind="tags", term="rust") | safe }}" class="nav-chip">#rust</a>
+      <button class="theme-toggle" type="button" aria-label="Toggle theme" data-theme-toggle>
+        <span class="icon-sun">☀</span><span class="icon-moon">☾</span>
+      </button>
+    </nav>
+  </div>
+</header>

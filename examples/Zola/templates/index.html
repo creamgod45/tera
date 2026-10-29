@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">{{ config.extra.author }} · {{ config.extra.tagline }}</p>
+  <h1>{{ section.extra.headline }}</h1>
+  <p class="lead">{{ section.extra.lead }}</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="{{ get_url(path="@/blog/_index.md") | safe }}">讀文章</a>
+    <a class="btn" href="{{ get_url(path="@/projects/_index.md") | safe }}">看專案</a>
+  </div>
+</section>
+
+{% set blog = get_section(path="blog/_index.md") %}
+{% set tags = get_taxonomy(kind="tags") %}
+
+<section class="stats">
+  <div class="stat"><strong>{{ blog.pages | length }}</strong><span>篇文章</span></div>
+  <div class="stat"><strong>{{ tags.items | length }}</strong><span>個標籤</span></div>
+  <div class="stat"><strong>{{ [p.extra.series for p in blog.pages if p.extra.series is defined] | unique | length }}</strong><span>個系列</span></div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>最新文章</h2>
+    <a href="{{ get_url(path="@/blog/_index.md") | safe }}">全部 →</a>
+  </div>
+  <div class="grid">
+    {% for page in blog.pages[:4] %}
+      {{ <post_card page={page}/> }}
+    {% endfor %}
+  </div>
+</section>
+
+<section>
+  <div class="section-head"><h2>主題</h2></div>
+  <ul class="cloud">
+    {% for tag in tags.items %}
+      <li><a href="{{ tag.permalink | safe }}">#{{ tag.name }} <span>{{ tag.pages | length }}</span></a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock content %}
