@@ -13,6 +13,8 @@ This guide shows what the plugin does for you while you write [Tera](https://git
 3. A local build replaces the installed plugin with the same ID (`com.tera.tera`). The version number may not change
    between two local builds, so restart fully after installing.
 
+**Another Tera plugin.** This plugin declares the original `Tera` plugin (`com.tera.tera`) as incompatible, because both register the `.tera` file type. If both are installed the IDE reports the conflict in **Settings → Plugins**; uninstall or disable one of them and restart.
+
 **Which IDE.** Any JetBrains IDE with HTML support. Everything about Rust (variables from your structs, template names
 in Rust strings, renaming a template in Rust code) needs RustRover, or CLion/IntelliJ IDEA with the Rust plugin.
 

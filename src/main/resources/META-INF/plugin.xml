@@ -60,6 +60,9 @@
         </ul>
     ]]></description>
 
+    <!-- The original Tera plugin registers the same file type and language; both cannot run together. -->
+    <incompatible-with>com.tera.tera</incompatible-with>
+
     <depends>com.intellij.modules.lang</depends>
     <depends>com.intellij.modules.xml</depends>
     <!-- Render context from Rust code (Template::render): RustRover / CLion, and IntelliJ IDEA's Rust plugin -->
