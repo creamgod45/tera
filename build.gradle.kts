@@ -67,19 +67,26 @@ intellijPlatform {
         }
 
         changeNotes = """
-            Editor basics: Cmd+/ comments with {# #}, brace matching, auto-closing of {{, {% and {#, folding of block/for/if/macro/component/filter/raw, live templates (macro/import for Tera 1, component/ternary/comprehension for Tera 2), and Reformat Code that re-indents by tag nesting.
-            Navigation: blocks along the extends chain (go to the parent block, overrides and super() with gutter icons), usages of a component, template names in Rust strings, and clickable template errors in the Run window.
-            Refactoring: Find Usages and Rename for blocks, macros, variables and components, and renaming or moving a template file updates extends/include/import and the Rust strings that name it.
-            Render context: found by meaning from any call that passes a template path and a serializable value (generic page shells, let locals, Rocket form Context), custom filters' return types, a Template roots setting, and variables described by a JSON Schema file (tera-context.json).
-            Lists and maps: loop/join quick fixes for {{ list }}, a warning for printing them as they are, and an error for an unfinished filter chain.
-            Fix false errors for whitespace-trimming delimiters and named endmacro/endblock tags.
-            Check macro calls against definitions (including import "..." as alias) and add macro, argument, namespace, keyword and template-name completion.
-            Types for Tera 2: unknown component parameter types and defaults of another type, values of the wrong type for a component attribute, and filters or tests applied to a value of a kind they reject, with convert quick fixes and fit-first completion.
-            Tera versions: detect 1.x or 2.x per template (Cargo.toml, Settings), version-specific built-ins, deprecation markers for what Tera 2 removed or renamed, quick fixes, Migrate to Tera 2 for a file or the whole project, and Tera 2 components (completion, checks, hover, navigation).
-            Detect functions, filters and tests registered from Rust (register_function/register_filter/register_tester) for completion, hover and navigation; add signatures and argument completion for Tera's built-ins.
-            Complete and check template variables from the Rust code that renders them (Template::render): struct fields, context! keys, loop and set variables, filters, tests and functions.
-            Add go to definition (with a chooser for multiple sources) and hover documentation for macros, parameters and import aliases, including comment descriptions and @param types.
-            Integrate native template data language parsing and highlighting for HTML, CSS and JavaScript.
+            <h3>1.3.0</h3>
+            <ul>
+              <li><b>Know where a variable comes from</b>: fields and types are read from the Rust code that renders the template, with hover docs and "not defined" warnings.</li>
+              <li><b>Tera 2 ready</b>: components, type checks, comprehensions explained on hover, and one-click migration from Tera 1.</li>
+              <li><b>Find components fast</b>: Cmd+click or the gutter icon lists each definition with its line and file.</li>
+              <li><b>Safer editing</b>: live templates are no longer offered inside <code>{{ }}</code>; no false errors for <code>{%-</code>, <code>-%}</code> or named end tags.</li>
+              <li><b>Printing a list or map?</b> Alt+Enter turns it into a loop or a join.</li>
+              <li><b>Errors you can click</b> in the Run window, and open a template from the Rust string that names it.</li>
+            </ul>
+            <p>Works alone: disable or uninstall the original "Tera" plugin first (both use <code>.tera</code>).</p>
+            <hr/>
+            <ul>
+              <li><b>看得出變數來源</b>：欄位與型別來自渲染模板的 Rust 程式碼，有 hover 說明與「未定義」警告。</li>
+              <li><b>支援 Tera 2</b>：元件、型別檢查、推導式說明，可一鍵從 Tera 1 遷移。</li>
+              <li><b>快速找元件</b>：Cmd+點擊或邊欄圖示，列出每個定義的行內容與檔案。</li>
+              <li><b>編輯更安全</b>：<code>{{ }}</code> 內不再出現 Live Template；<code>{%-</code>、<code>-%}</code> 與具名結束標籤不再誤報。</li>
+              <li><b>直接輸出清單或 map？</b>Alt+Enter 改成迴圈或 join。</li>
+              <li><b>錯誤可點擊</b>（Run 視窗），也能從 Rust 字串開啟對應模板。</li>
+            </ul>
+            <p>請先停用或移除原本的「Tera」外掛（兩者都使用 <code>.tera</code>）。</p>
         """.trimIndent()
     }
 }
