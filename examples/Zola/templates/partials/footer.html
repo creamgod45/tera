@@ -1,0 +1,9 @@
+<footer class="site-footer">
+  <div class="wrap foot">
+    <p>© {{ now() | date(format="%Y") }} {{ config.extra.author }} · Built with <a href="https://www.getzola.org/">Zola</a></p>
+    <p>
+      <a href="{{ get_url(path="atom.xml") | safe }}">RSS</a> ·
+      <a href="{{ config.extra.github }}">GitHub</a>
+    </p>
+  </div>
+</footer>

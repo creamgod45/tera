@@ -166,5 +166,37 @@ Rust 程式印出模板錯誤時，位置會變成連結：Tera 2 的 ` --> page
 ## 13. 限制
 
 診斷是結構檢查，不是完整的 Tera 執行環境。Rust 探索是靜態的：執行期才建立的值（在迴圈裡填的 map、`serde_json::Value`）
-是未知的，用 `add_raw_template` 加入的模板沒有檔案。尚未完成：Zola 專用變數、block 層級的懸停說明、帶點元件名稱的 Alt+F7、
+是未知的，用 `add_raw_template` 加入的模板沒有檔案。尚未完成：block 層級的懸停說明、帶點元件名稱的 Alt+F7、
 使用清單中命中名稱的粗體標示、由 `macro_rules!` 產生的模板路徑。`MANUAL-CHECK.md` 列出建議在 IDE 裡親手試的項目。
+
+## 14. Zola 網站
+
+[Zola](https://www.getzola.org/) 用 Tera 渲染 `templates/*.html`，但外掛預設只開啟 `.tera` 檔。請告訴 IDE 你的 `.html` 檔是
+Tera 模板：
+
+1. **Settings → Editor → File Types → Tera Template → +**（Registered Patterns），加入 `*.html`。
+2. 開啟 `templates/` 下的模板。`{{ }}` 與 `{% %}` 會上色，周圍的 HTML、CSS、JavaScript 照常運作。
+3. Zola 網站沒有 `Cargo.toml`，Tera 版本會退回 2.x，這對 Zola 0.23 以後是正確的。舊版 Zola（Tera 1）請把 **Settings →
+   Languages & Frameworks → Tera → Tera version** 設為 1.x。
+
+這個樣式會套用到整個專案的所有 `.html` 檔，不只 `templates/`，適合純 Zola 的網站。若專案裡還有一般 HTML 頁面，請另開一個
+IDE 專案，或接受它們也被當成 Tera 上色。
+
+專案裡有 `zola.toml`（或舊版放在 `content/` 與 `templates/` 旁的 `config.toml`）時，外掛會多提供：
+
+- **`.html` 裡的元件**：`macros.html` 裡的 `{% component post_card(page) %}` 在所有模板都找得到，有補全、懸停、跳到定義與
+  重新命名。
+- **Zola 函式與 filter**：`get_url`、`get_page`、`get_section`、`get_taxonomy`、`get_taxonomy_term`、`get_taxonomy_url`、
+  `get_hash`、`get_image_metadata`、`resize_image`、`load_data`、`trans`，以及 filter `markdown`、`regex_replace`、
+  `num_format`、`base64_encode`、`base64_decode`。
+- **Zola 仍然提供的 filter**：`date`、`striptags`、`slugify`、`urlencode`、`json_encode`、`filesizeformat`、`spaceless`、
+  `matching`、`now`、`get_random` 不會被標成 Tera 2 已移除。
+- **變數**，依模板種類：`page.html` 有 `page`；`section.html` 與 `index.html` 有 `section`、`paginator`；
+  `<分類>/list.html` 與 `single.html` 有 `taxonomy`、`terms`、`term`（分類必須寫在 `zola.toml`）；所有模板都有 `config`、
+  `lang`、`zola_version`；除了 `404.html`，都有 `current_path`、`current_url`。有補全、懸停，欄位拼錯會警告（`page.titl`）。
+  `extra` 與 `config.extra` 可以接任何欄位。
+- **自訂模板**：Markdown front matter 用 `template = "project.html"`（或 `page_template`）指定的模板，會拿到頁面的變數
+  （`_index.md` 則是區段）。`base.html` 與 partial 取用 extends 或 include 它們的模板的變數。無法判斷用途的模板不做檢查。
+
+Zola 0.23 移除了 shortcode；請改寫成元件，用 `{{ <callout kind="note"/> }}` 呼叫。Markdown 內容裡的 Tera 語法要用
+`{% raw %}` 包起來。`examples/Zola` 是用到上述所有功能的完整範例站。

@@ -145,7 +145,7 @@ object TeraContexts {
                         LOG.warn("Tera context provider ${p.javaClass.name} failed", e)
                         emptyList()
                     }
-                },
+                } + (if (TeraZola.isZolaProject(project)) TeraZola.builtins else emptyList()),
                 PsiModificationTracker.MODIFICATION_COUNT,
             )
         }

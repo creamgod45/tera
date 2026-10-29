@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block head %}
+  {% if current_url %}<link rel="canonical" href="{{ current_url | safe }}">{% endif %}
+  <title>{% block title %}{{ config.title }}{% endblock title %}</title>
+  <meta name="description" content="{% block description %}{{ config.description }}{% endblock description %}">
+  <link rel="alternate" type="application/atom+xml" title="{{ config.title }}" href="{{ get_url(path="atom.xml") | safe }}">
+  <link rel="stylesheet" href="{{ get_url(path="style.css") | safe }}">
+  <script>
+    // Apply the saved theme before the first paint, so there is no flash.
+    try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  {% endblock head %}
+</head>
+<body>
+  {% include "partials/header.html" %}
+  <main class="wrap">
+    {% block content %}{% endblock content %}
+  </main>
+  {% include "partials/footer.html" %}
+  <script src="{{ get_url(path="js/theme.js") | safe }}" defer></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} · {{ config.title }}{% endblock title %}
+{% block description %}{{ page.description }}{% endblock description %}
+
+{% block content %}
+{% set blog = get_section(path="blog/_index.md") %}
+{% if page.extra.series is defined %}
+  {% set series = [p for p in blog.pages if p.extra.series is defined and p.extra.series == page.extra.series] %}
+{% else %}
+  {% set series = [] %}
+{% endif %}
+
+<article class="post">
+  <header class="post-head">
+    <div class="card-meta">
+      <time datetime="{{ page.date }}">{{ page.date | date(format="%Y-%m-%d") }}</time>
+      <span>·</span><span>{{ page.reading_time }} 分鐘</span>
+      <span>·</span><span>{{ page.word_count }} 字</span>
+      {% if page.updated %}<span>·</span><span>更新 {{ page.updated | date(format="%Y-%m-%d") }}</span>{% endif %}
+    </div>
+    <h1>{{ page.title }}</h1>
+    {% if page.description %}<p class="lead">{{ page.description }}</p>{% endif %}
+    {{ <tag_list page={page}/> }}
+  </header>
+
+  <div class="post-grid">
+    {% if page.toc | length > 0 %}
+    <aside class="toc">
+      <p class="toc-title">目錄</p>
+      <ol>
+        {% for h1 in page.toc %}
+          <li><a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
+            {% if h1.children | length > 0 %}
+            <ol>
+              {% for h2 in h1.children %}
+                <li><a href="{{ h2.permalink | safe }}">{{ h2.title }}</a></li>
+              {% endfor %}
+            </ol>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </aside>
+    {% endif %}
+
+    <div class="prose">
+      {{ page.content | safe }}
+    </div>
+  </div>
+
+  {% if series | length > 1 %}
+  <aside class="series">
+    <p class="toc-title">系列：{{ page.extra.series }}</p>
+    <ol>
+      {% for p in series | sort(attribute="extra.series_part") %}
+        <li{% if p.permalink == page.permalink %} class="current"{% endif %}>
+          {% if p.permalink == page.permalink %}{{ p.title }}{% else %}<a href="{{ p.permalink | safe }}">{{ p.title }}</a>{% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  </aside>
+  {% endif %}
+
+  <nav class="post-nav">
+    {% if page.higher %}<a class="card" href="{{ page.higher.permalink | safe }}"><span>較新</span>{{ page.higher.title }}</a>{% else %}<span></span>{% endif %}
+    {% if page.lower %}<a class="card" href="{{ page.lower.permalink | safe }}"><span>較舊</span>{{ page.lower.title }}</a>{% endif %}
+  </nav>
+</article>
+{% endblock content %}

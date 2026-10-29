@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.tera"
-version = "1.3.0"
+version = "1.3.1"
 
 repositories {
     mavenCentral()
@@ -67,26 +67,20 @@ intellijPlatform {
         }
 
         changeNotes = """
-            <h3>1.3.0</h3>
+            <h3>1.3.1</h3>
             <ul>
-              <li><b>Know where a variable comes from</b>: fields and types are read from the Rust code that renders the template, with hover docs and "not defined" warnings.</li>
-              <li><b>Tera 2 ready</b>: components, type checks, comprehensions explained on hover, and one-click migration from Tera 1.</li>
-              <li><b>Find components fast</b>: Cmd+click or the gutter icon lists each definition with its line and file.</li>
-              <li><b>Safer editing</b>: live templates are no longer offered inside <code>{{ }}</code>; no false errors for <code>{%-</code>, <code>-%}</code> or named end tags.</li>
-              <li><b>Printing a list or map?</b> Alt+Enter turns it into a loop or a join.</li>
-              <li><b>Errors you can click</b> in the Run window, and open a template from the Rust string that names it.</li>
+              <li><b>Zola sites</b>: components defined in <code>.html</code> templates are found, no more "Unknown component".</li>
+              <li><b>Zola functions and filters</b> (<code>get_url</code>, <code>get_section</code>, <code>markdown</code>, …) are known, and <code>date</code> or <code>striptags</code> are no longer reported as removed.</li>
+              <li><b>Zola variables</b>: <code>page</code>, <code>section</code>, <code>term</code> and <code>config</code> have completion, hover and typo warnings.</li>
             </ul>
-            <p>Works alone: disable or uninstall the original "Tera" plugin first (both use <code>.tera</code>).</p>
+            <p>Register <code>*.html</code> under Settings → Editor → File Types → Tera Template to use it in a Zola site.</p>
             <hr/>
             <ul>
-              <li><b>看得出變數來源</b>：欄位與型別來自渲染模板的 Rust 程式碼，有 hover 說明與「未定義」警告。</li>
-              <li><b>支援 Tera 2</b>：元件、型別檢查、推導式說明，可一鍵從 Tera 1 遷移。</li>
-              <li><b>快速找元件</b>：Cmd+點擊或邊欄圖示，列出每個定義的行內容與檔案。</li>
-              <li><b>編輯更安全</b>：<code>{{ }}</code> 內不再出現 Live Template；<code>{%-</code>、<code>-%}</code> 與具名結束標籤不再誤報。</li>
-              <li><b>直接輸出清單或 map？</b>Alt+Enter 改成迴圈或 join。</li>
-              <li><b>錯誤可點擊</b>（Run 視窗），也能從 Rust 字串開啟對應模板。</li>
+              <li><b>Zola 網站</b>：找得到 <code>.html</code> 模板裡定義的元件，不再顯示「Unknown component」。</li>
+              <li><b>Zola 函式與 filter</b>（<code>get_url</code>、<code>get_section</code>、<code>markdown</code>……）可辨識，<code>date</code>、<code>striptags</code> 不再被標為已移除。</li>
+              <li><b>Zola 變數</b>：<code>page</code>、<code>section</code>、<code>term</code>、<code>config</code> 有補全、懸停說明與拼字警告。</li>
             </ul>
-            <p>請先停用或移除原本的「Tera」外掛（兩者都使用 <code>.tera</code>）。</p>
+            <p>在 Zola 網站使用請到 Settings → Editor → File Types → Tera Template 加入 <code>*.html</code>。</p>
         """.trimIndent()
     }
 }

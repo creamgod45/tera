@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}404 · {{ config.title }}{% endblock title %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">404</p>
+  <h1>找不到這一頁</h1>
+  <p class="lead">網址可能打錯了，或文章搬家了。</p>
+  <a class="btn btn-primary" href="{{ get_url(path="@/_index.md") | safe }}">回首頁</a>
+</section>
+{% endblock content %}
